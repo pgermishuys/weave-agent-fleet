@@ -50,7 +50,7 @@ export function mergeMessageUpdate(
   const existing = prev[index];
   const completedAt = info.time?.completed;
   if (!completedAt || existing.completedAt) return prev; // nothing new to merge
-  const updated = [...prev];
+  const updated = prev.slice();
   updated[index] = { ...existing, completedAt };
   return updated;
 }
@@ -141,37 +141,38 @@ export function applyTextDelta(
   sessionId: string,
   delta: string
 ): AccumulatedMessage[] {
-  // Ensure message exists
-  let msgs = prev;
-  if (!msgs.find((m) => m.messageId === messageId)) {
+  const msgIndex = prev.findIndex((m) => m.messageId === messageId);
+
+  if (msgIndex === -1) {
+    // Message doesn't exist — append new message with the delta as first part
     const newMsg: AccumulatedMessage = {
       messageId,
       sessionId,
       role: "assistant",
-      parts: [],
+      parts: [{ partId, type: "text", text: delta }],
     };
-    msgs = [...prev, newMsg];
+    return [...prev, newMsg];
   }
 
-  return msgs.map((msg) => {
-    if (msg.messageId !== messageId) return msg;
+  const msg = prev[msgIndex];
+  const partIndex = msg.parts.findIndex(
+    (p) => p.type === "text" && p.partId === partId
+  );
 
-    const existingPart = msg.parts.find(
-      (p): p is AccumulatedTextPart => p.type === "text" && p.partId === partId
-    );
-    if (existingPart) {
-      return {
-        ...msg,
-        parts: msg.parts.map((p) =>
-          p.partId === partId && p.type === "text"
-            ? { ...p, text: p.text + delta }
-            : p
-        ),
-      };
-    }
+  let updatedMsg: AccumulatedMessage;
+  if (partIndex !== -1) {
+    const existingPart = msg.parts[partIndex] as AccumulatedTextPart;
+    const newParts = msg.parts.slice();
+    newParts[partIndex] = { ...existingPart, text: existingPart.text + delta };
+    updatedMsg = { ...msg, parts: newParts };
+  } else {
     const newPart: AccumulatedTextPart = { partId, type: "text", text: delta };
-    return { ...msg, parts: [...msg.parts, newPart] };
-  });
+    updatedMsg = { ...msg, parts: [...msg.parts, newPart] };
+  }
+
+  const next = prev.slice();
+  next[msgIndex] = updatedMsg;
+  return next;
 }
 
 /**
