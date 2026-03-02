@@ -238,6 +238,54 @@ export function updateSessionForResume(id: string, instanceId: string): void {
     .run({ id, instance_id: instanceId });
 }
 
+export function searchSessions(opts: {
+  search?: string;
+  status?: string;
+  fromDate?: string;
+  toDate?: string;
+  limit?: number;
+  offset?: number;
+}): { sessions: DbSession[]; total: number } {
+  const db = getDb();
+  const conditions: string[] = [];
+  const params: Record<string, unknown> = {};
+
+  if (opts.search) {
+    conditions.push("title LIKE @search");
+    params.search = `%${opts.search}%`;
+  }
+
+  if (opts.status) {
+    conditions.push("status = @status");
+    params.status = opts.status;
+  }
+
+  if (opts.fromDate) {
+    conditions.push("created_at >= @fromDate");
+    params.fromDate = opts.fromDate;
+  }
+
+  if (opts.toDate) {
+    conditions.push("created_at <= @toDate");
+    params.toDate = opts.toDate;
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  const countRow = db
+    .prepare(`SELECT COUNT(*) as count FROM sessions ${where}`)
+    .get(params) as { count: number };
+
+  const limit = opts.limit ?? 20;
+  const offset = opts.offset ?? 0;
+
+  const sessions = db
+    .prepare(`SELECT * FROM sessions ${where} ORDER BY created_at DESC LIMIT @limit OFFSET @offset`)
+    .all({ ...params, limit, offset }) as DbSession[];
+
+  return { sessions, total: countRow.count };
+}
+
 export function getSessionsForWorkspace(workspaceId: string): DbSession[] {
   return getDb()
     .prepare("SELECT * FROM sessions WHERE workspace_id = ?")

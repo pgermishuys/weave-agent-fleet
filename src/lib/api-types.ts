@@ -213,3 +213,22 @@ export interface AddWorkspaceRootResponse {
   id: string;
   path: string;
 }
+
+// ─── Session History Types ──────────────────────────────────────────────────
+
+export interface HistorySession {
+  id: string;
+  opencodeSessionId: string | null;
+  instanceId: string;
+  title: string | null;
+  status: string;
+  directory: string;
+  workspaceDisplayName: string | null;
+  createdAt: string;
+  stoppedAt: string | null;
+}
+
+export interface HistoryResponse {
+  sessions: HistorySession[];
+  total: number;
+}
