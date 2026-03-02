@@ -10,7 +10,7 @@ interface UseAutocompleteParams {
   value: string;
   setValue: (value: string) => void;
   instanceId: string;
-  inputRef: RefObject<HTMLInputElement | null>;
+  inputRef: RefObject<HTMLTextAreaElement | null>;
   cursorPosition: number;
 }
 
@@ -20,7 +20,7 @@ export interface UseAutocompleteResult {
   isLoading: boolean;
   error?: string;
   selectedValue: string | null;
-  onKeyDown: (e: KeyboardEvent<HTMLInputElement>) => void;
+  onKeyDown: (e: KeyboardEvent<HTMLTextAreaElement>) => void;
   onSelect: (value: string) => void;
   onClose: () => void;
 }
@@ -202,7 +202,7 @@ export function useAutocomplete({
 
   // ─── Keyboard handling ──────────────────────────────────────────────────────
   const onKeyDown = useCallback(
-    (e: KeyboardEvent<HTMLInputElement>) => {
+    (e: KeyboardEvent<HTMLTextAreaElement>) => {
       if (!isOpen) return;
 
       switch (e.key) {

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Input } from "@/components/ui/input";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Send, Loader2, AlertCircle } from "lucide-react";
 import { useAutocomplete } from "@/hooks/use-autocomplete";
@@ -33,7 +33,10 @@ export function PromptInput({
   const [value, setValue] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [cursorPos, setCursorPos] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const historyRef = useRef<string[]>([]);
+  const historyIndexRef = useRef<number>(-1);
 
   const isDisabled = disabled || isSending;
 
@@ -59,9 +62,85 @@ export function PromptInput({
 
   const canSend = !!value.trim() && !isDisabled && !autocomplete.isOpen;
 
-  // Sync cursor position from the input element
+  // Sync cursor position from the textarea element
   const updateCursor = () => {
     setCursorPos(inputRef.current?.selectionStart ?? 0);
+  };
+
+  // ─── Auto-resize textarea ────────────────────────────────────────────────
+  const maxHeight = 150;
+
+  useLayoutEffect(() => {
+    const textarea = inputRef.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    const newHeight = Math.min(textarea.scrollHeight, maxHeight);
+    textarea.style.height = newHeight + "px";
+    textarea.style.overflowY = textarea.scrollHeight > maxHeight ? "auto" : "hidden";
+  }, [value]);
+
+  // ─── Send logic ──────────────────────────────────────────────────────────
+  const handleSend = async () => {
+    if (autocomplete.isOpen) return;
+    if (!canSend) return;
+    const text = value.trim();
+
+    // Push to history
+    historyRef.current.push(text);
+    historyIndexRef.current = -1;
+
+    setValue("");
+    setIsSending(true);
+    try {
+      await onSend?.(text, selectedAgent ?? undefined);
+    } finally {
+      setIsSending(false);
+      inputRef.current?.focus();
+    }
+  };
+
+  // ─── Keyboard handling ───────────────────────────────────────────────────
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Enter without Shift: send (unless autocomplete is open)
+    if (e.key === "Enter" && !e.shiftKey) {
+      if (!autocomplete.isOpen) {
+        e.preventDefault();
+        void handleSend();
+        return;
+      }
+    }
+
+    // ArrowUp: recall previous history entry when value is empty
+    if (e.key === "ArrowUp" && !autocomplete.isOpen && value === "") {
+      const history = historyRef.current;
+      if (history.length === 0) return;
+      e.preventDefault();
+      const newIndex =
+        historyIndexRef.current === -1
+          ? history.length - 1
+          : Math.max(0, historyIndexRef.current - 1);
+      historyIndexRef.current = newIndex;
+      setValue(history[newIndex]);
+      return;
+    }
+
+    // ArrowDown: walk forward through history when browsing
+    if (e.key === "ArrowDown" && !autocomplete.isOpen && historyIndexRef.current !== -1) {
+      e.preventDefault();
+      const history = historyRef.current;
+      const newIndex = historyIndexRef.current + 1;
+      if (newIndex >= history.length) {
+        historyIndexRef.current = -1;
+        setValue("");
+      } else {
+        historyIndexRef.current = newIndex;
+        setValue(history[newIndex]);
+      }
+      return;
+    }
+
+    // Delegate all other keys to autocomplete
+    autocomplete.onKeyDown(e);
   };
 
   return (
@@ -83,22 +162,10 @@ export function PromptInput({
         </div>
       )}
       <form
-        onSubmit={async (e) => {
+        onSubmit={(e) => {
           e.preventDefault();
-          // Don't submit if autocomplete is open — Enter selects an item instead
-          if (autocomplete.isOpen) return;
-          if (!canSend) return;
-          const text = value.trim();
-          setValue("");
-          setIsSending(true);
-          try {
-            await onSend?.(text, selectedAgent ?? undefined);
-          } finally {
-            setIsSending(false);
-            inputRef.current?.focus();
-          }
         }}
-        className="flex items-center gap-2"
+        className="flex items-end gap-2"
       >
         {agents.length > 0 && (
           <AgentSelector
@@ -108,16 +175,18 @@ export function PromptInput({
             disabled={isDisabled}
           />
         )}
-        <Input
+        <Textarea
           ref={inputRef}
+          rows={1}
           value={value}
           onChange={(e) => {
             setValue(e.target.value);
             setCursorPos(e.target.selectionStart ?? 0);
+            historyIndexRef.current = -1;
           }}
           onClick={updateCursor}
           onSelect={updateCursor}
-          onKeyDown={autocomplete.onKeyDown}
+          onKeyDown={handleKeyDown}
           onBlur={() => {
             // Delay closing to allow click-to-select on popup items
             setTimeout(() => {
@@ -127,6 +196,7 @@ export function PromptInput({
           placeholder="Send a message to this session..."
           className="text-sm"
           disabled={isDisabled}
+          style={{ overflowY: "hidden" }}
           // Accessibility attributes for combobox pattern
           role="combobox"
           aria-expanded={autocomplete.isOpen}
@@ -141,10 +211,11 @@ export function PromptInput({
           autoComplete="off"
         />
         <Button
-          type="submit"
+          type="button"
           size="icon"
           variant="default"
           disabled={!canSend}
+          onClick={() => void handleSend()}
         >
           {isSending ? (
             <Loader2 className="h-4 w-4 animate-spin" />
