@@ -25,6 +25,8 @@ export interface UseSessionEventsResult {
   status: SessionConnectionStatus;
   sessionStatus: "idle" | "busy";
   error?: string;
+  /** Imperatively transition sessionStatus to "idle" (e.g. after a successful abort). */
+  forceIdle: () => void;
 }
 
 const MAX_RECONNECT_DELAY_MS = 30_000;
@@ -188,7 +190,9 @@ export function useSessionEvents(
     };
   }, [connect]);
 
-  return { messages, status, sessionStatus, error };
+  const forceIdle = useCallback(() => setSessionStatus("idle"), []);
+
+  return { messages, status, sessionStatus, error, forceIdle };
 }
 
 // ─── Event handler (pure — receives setters to avoid stale closures) ──────

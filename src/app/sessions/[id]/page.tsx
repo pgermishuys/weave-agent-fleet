@@ -45,7 +45,7 @@ export default function SessionDetailPage() {
   const { agents } = useAgents(instanceId);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
 
-  const { messages, status, sessionStatus, error } = useSessionEvents(
+  const { messages, status, sessionStatus, error, forceIdle } = useSessionEvents(
     sessionId,
     instanceId,
     setSelectedAgent
@@ -219,12 +219,13 @@ export default function SessionDetailPage() {
     }
     try {
       await abortSession(sessionId, instanceId);
+      forceIdle();
     } catch {
       // error surfaced via useAbortSession
     } finally {
       setAbortConfirm(false);
     }
-  }, [abortConfirm, abortSession, sessionId, instanceId]);
+  }, [abortConfirm, abortSession, sessionId, instanceId, forceIdle]);
 
   // Reset abort confirmation when session leaves busy state
   useEffect(() => {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClientForInstance } from "@/lib/server/opencode-client";
+import { getSessionByOpencodeId, updateSessionStatus } from "@/lib/server/db-repository";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -32,6 +33,16 @@ export async function POST(
 
   try {
     await client.session.abort({ sessionID: sessionId });
+
+    try {
+      const dbSession = getSessionByOpencodeId(sessionId);
+      if (dbSession) {
+        updateSessionStatus(dbSession.id, "idle");
+      }
+    } catch {
+      // DB update failure must not fail the abort response
+    }
+
     return NextResponse.json(
       { message: "Session aborted", sessionId, instanceId },
       { status: 200 }
