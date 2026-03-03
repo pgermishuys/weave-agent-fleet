@@ -54,7 +54,6 @@ export function NotificationsProvider({
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Guard ref: prevents SSE onmessage from resurrecting notifications
   // that are being cleared by clearAll. Set true before the DELETE call,
@@ -175,7 +174,7 @@ export function NotificationsProvider({
           notification: DbNotification;
         };
         if (data.type === "notification" && data.notification) {
-          setUnreadCount((prev) => Math.min(prev + 1, 9999));
+          setUnreadCount((prev) => prev + 1);
           setNotifications((prev) =>
             [data.notification, ...prev].slice(0, 50)
           );
@@ -193,12 +192,7 @@ export function NotificationsProvider({
       fetchUnreadCount();
       startPolling();
       // Attempt SSE reconnect after delay
-      if (reconnectTimerRef.current) {
-        clearTimeout(reconnectTimerRef.current);
-        reconnectTimerRef.current = null;
-      }
-      reconnectTimerRef.current = setTimeout(() => {
-        reconnectTimerRef.current = null;
+      setTimeout(() => {
         if (isMounted.current && !eventSourceRef.current) connectSSE();
       }, SSE_RECONNECT_DELAY_MS);
     };
@@ -214,10 +208,6 @@ export function NotificationsProvider({
       isMounted.current = false;
       eventSourceRef.current?.close();
       eventSourceRef.current = null;
-      if (reconnectTimerRef.current) {
-        clearTimeout(reconnectTimerRef.current);
-        reconnectTimerRef.current = null;
-      }
       stopPolling();
     };
   }, [fetchUnreadCount, connectSSE, startPolling, stopPolling]);

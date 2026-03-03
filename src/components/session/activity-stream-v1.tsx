@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Bot, User, Wrench, Loader2, AlertCircle } from "lucide-react";
@@ -124,10 +124,10 @@ function ToolCallItem({ part }: { part: AccumulatedPart & { type: "tool" } }) {
 interface MessageItemProps {
   message: AccumulatedMessage;
   agents?: AutocompleteAgent[];
-  parentCreatedAt?: number;
+  allMessages?: AccumulatedMessage[];
 }
 
-const MessageItem = memo(function MessageItem({ message, agents, parentCreatedAt }: MessageItemProps) {
+function MessageItem({ message, agents, allMessages }: MessageItemProps) {
   const isUser = message.role === "user";
   const textParts = message.parts.filter((p) => p.type === "text");
   const toolParts = message.parts.filter(
@@ -144,8 +144,11 @@ const MessageItem = memo(function MessageItem({ message, agents, parentCreatedAt
 
   // Compute duration for assistant messages
   let durationStr: string | null = null;
-  if (!isUser && message.completedAt && parentCreatedAt) {
-    durationStr = formatDuration(message.completedAt - parentCreatedAt);
+  if (!isUser && message.completedAt && message.parentID && allMessages) {
+    const parent = allMessages.find((m) => m.messageId === message.parentID);
+    if (parent?.createdAt) {
+      durationStr = formatDuration(message.completedAt - parent.createdAt);
+    }
   }
 
   return (
@@ -226,7 +229,7 @@ const MessageItem = memo(function MessageItem({ message, agents, parentCreatedAt
       </div>
     </div>
   );
-});
+}
 
 // ─── Activity Stream ────────────────────────────────────────────────────────
 
@@ -238,32 +241,10 @@ export function ActivityStreamV1({
   agents,
 }: ActivityStreamV1Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
-  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const prevMessageCountRef = useRef(0);
 
-  // Auto-scroll to bottom when new content arrives (debounced)
+  // Auto-scroll to bottom when new content arrives
   useEffect(() => {
-    const messageCount = messages.length;
-    const isNewMessage = messageCount !== prevMessageCountRef.current;
-    prevMessageCountRef.current = messageCount;
-
-    if (scrollTimerRef.current) {
-      clearTimeout(scrollTimerRef.current);
-    }
-
-    scrollTimerRef.current = setTimeout(() => {
-      bottomRef.current?.scrollIntoView({
-        behavior: isNewMessage ? "smooth" : "auto",
-      });
-      scrollTimerRef.current = null;
-    }, 150);
-
-    return () => {
-      if (scrollTimerRef.current) {
-        clearTimeout(scrollTimerRef.current);
-        scrollTimerRef.current = null;
-      }
-    };
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   // Derive active agent from the latest user message when busy
@@ -272,14 +253,6 @@ export function ActivityStreamV1({
     : null;
   const activeAgentMeta = activeAgentName ? agents?.find((a) => a.name === activeAgentName) : undefined;
   const activeAgentColor = activeAgentName ? resolveAgentColor(activeAgentName, activeAgentMeta?.color) : undefined;
-
-  const createdAtByMessageId = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const msg of messages) {
-      if (msg.createdAt != null) map.set(msg.messageId, msg.createdAt);
-    }
-    return map;
-  }, [messages]);
 
   return (
     <div className="flex flex-col h-full">
@@ -317,7 +290,7 @@ export function ActivityStreamV1({
               key={message.messageId}
               message={message}
               agents={agents}
-              parentCreatedAt={message.parentID ? createdAtByMessageId.get(message.parentID) : undefined}
+              allMessages={messages}
             />
           ))}
 
