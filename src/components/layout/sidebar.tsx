@@ -44,7 +44,7 @@ const FLEET_EXPANDED_KEY = "weave:sidebar:fleet-expanded";
 export function Sidebar() {
   const pathname = usePathname();
   const { unreadCount } = useNotifications();
-  const { sessions, error } = useSessionsContext();
+  const { sessions, error, refetch } = useSessionsContext();
   const workspaces = useWorkspaces(sessions);
   const {
     collapsed,
@@ -308,6 +308,7 @@ export function Sidebar() {
                       key={group.workspaceDirectory}
                       group={group}
                       activeSessionPath={pathname}
+                      refetch={refetch}
                     />
                   ))
                 )}

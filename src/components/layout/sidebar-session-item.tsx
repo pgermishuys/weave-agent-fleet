@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import Link from "next/link";
 import { Pencil, Square, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -12,18 +12,17 @@ import {
 } from "@/components/ui/context-menu";
 import { InlineEdit } from "@/components/ui/inline-edit";
 import { useRenameSession } from "@/hooks/use-rename-session";
-import { useSessionsContext } from "@/contexts/sessions-context";
 import type { SessionListItem } from "@/lib/api-types";
 
 interface SidebarSessionItemProps {
   item: SessionListItem;
   isActive: boolean;
   isChild?: boolean;
+  refetch: () => void;
 }
 
-export function SidebarSessionItem({ item, isActive, isChild = false }: SidebarSessionItemProps) {
+export const SidebarSessionItem = React.memo(function SidebarSessionItem({ item, isActive, isChild = false, refetch }: SidebarSessionItemProps) {
   const { instanceId, session, activityStatus, lifecycleStatus } = item;
-  const { refetch } = useSessionsContext();
   const { renameSession } = useRenameSession();
   const [isRenaming, setIsRenaming] = useState(false);
 
@@ -114,4 +113,4 @@ export function SidebarSessionItem({ item, isActive, isChild = false }: SidebarS
       </ContextMenuContent>
     </ContextMenu>
   );
-}
+});

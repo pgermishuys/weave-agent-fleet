@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ChevronRight, Pencil, Pin, Plus, Trash2 } from "lucide-react";
@@ -26,7 +26,6 @@ import {
 import { InlineEdit } from "@/components/ui/inline-edit";
 import { SidebarSessionItem } from "@/components/layout/sidebar-session-item";
 import { useRenameWorkspace } from "@/hooks/use-rename-workspace";
-import { useSessionsContext } from "@/contexts/sessions-context";
 import { useTerminateSession } from "@/hooks/use-terminate-session";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useOpenDirectory, usePreferredOpenTool } from "@/hooks/use-open-directory";
@@ -40,11 +39,13 @@ const PINNED_KEY = "weave:sidebar:pinned";
 interface SidebarWorkspaceItemProps {
   group: WorkspaceGroup;
   activeSessionPath: string;
+  refetch: () => void;
 }
 
-export function SidebarWorkspaceItem({
+export const SidebarWorkspaceItem = React.memo(function SidebarWorkspaceItem({
   group,
   activeSessionPath,
+  refetch,
 }: SidebarWorkspaceItemProps) {
   const searchParams = useSearchParams();
   const workspaceFilter = searchParams.get("workspace");
@@ -52,7 +53,6 @@ export function SidebarWorkspaceItem({
     ? group.sessions.some((s) => s.workspaceId === workspaceFilter)
     : false;
 
-  const { refetch } = useSessionsContext();
   const { renameWorkspace } = useRenameWorkspace();
   const { terminateSession } = useTerminateSession();
   const { openDirectory } = useOpenDirectory();
@@ -195,6 +195,7 @@ export function SidebarWorkspaceItem({
                   <SidebarSessionItem
                     item={item}
                     isActive={activeSessionPath === `/sessions/${item.session.id}`}
+                    refetch={refetch}
                   />
                   {children.map((child) => (
                     <SidebarSessionItem
@@ -202,6 +203,7 @@ export function SidebarWorkspaceItem({
                       item={child}
                       isActive={activeSessionPath === `/sessions/${child.session.id}`}
                       isChild
+                      refetch={refetch}
                     />
                   ))}
                 </div>
@@ -247,4 +249,4 @@ export function SidebarWorkspaceItem({
       </ContextMenuContent>
     </ContextMenu>
   );
-}
+});
