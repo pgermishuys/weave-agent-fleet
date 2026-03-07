@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +10,7 @@ import { ArrowRight, Clock, Copy, ExternalLink, GitBranch, Loader2, OctagonX, Ro
 import type { SessionListItem } from "@/lib/api-types";
 import { formatRelativeTime } from "@/lib/format-utils";
 
-export function LiveSessionCard({
+export const LiveSessionCard = React.memo(function LiveSessionCard({
   item,
   onTerminate,
   onResume,
@@ -215,4 +216,4 @@ export function LiveSessionCard({
       )}
     </div>
   );
-}
+});
