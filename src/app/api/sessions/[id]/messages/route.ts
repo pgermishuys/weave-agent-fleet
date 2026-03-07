@@ -10,7 +10,7 @@ interface RouteContext {
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 
-// GET /api/sessions/[id]/messages?instanceId=xxx&limit=50&before=<messageId>
+// GET /api/sessions/[id]/messages?instanceId=xxx&limit=50&before=<messageId>&after=<messageId>
 export async function GET(
   request: NextRequest,
   context: RouteContext,
@@ -23,6 +23,7 @@ export async function GET(
   const instanceId = searchParams.get("instanceId");
   const limitParam = searchParams.get("limit");
   const before = searchParams.get("before") ?? undefined;
+  const after = searchParams.get("after") ?? undefined;
 
   if (!instanceId) {
     return NextResponse.json(
@@ -52,6 +53,25 @@ export async function GET(
   try {
     const messagesResult = await client.session.messages({ sessionID: sessionId });
     const allMessages = messagesResult.data ?? [];
+
+    // If `after` is specified, return all messages after the given ID (for incremental reconnect loading)
+    if (after) {
+      const afterIndex = allMessages.findIndex((m: { info: { id: string } }) => m.info.id === after);
+      if (afterIndex === -1) {
+        // Cursor not found — return all messages (client will deduplicate)
+        const result = sliceMessages(allMessages, { limit, before });
+        return NextResponse.json(result, { status: 200 });
+      }
+      const messagesAfter = allMessages.slice(afterIndex + 1);
+      return NextResponse.json({
+        messages: messagesAfter,
+        pagination: {
+          hasMore: false,
+          oldestMessageId: messagesAfter.length > 0 ? messagesAfter[0].info.id : null,
+          totalCount: allMessages.length,
+        },
+      }, { status: 200 });
+    }
 
     const result = sliceMessages(allMessages, { limit, before });
 
