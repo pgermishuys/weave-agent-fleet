@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, Suspense } from "react";
+import { useCallback, useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Header, NewSessionButton } from "@/components/layout/header";
 import { SummaryBar } from "@/components/fleet/summary-bar";
@@ -50,32 +50,32 @@ function FleetPageInner() {
   );
   const [search, setSearch] = useState("");
 
-  const handleGroupByChange = (groupBy: GroupBy) => {
+  const handleGroupByChange = useCallback((groupBy: GroupBy) => {
     setPrefs((prev) => ({ ...prev, groupBy }));
-  };
+  }, [setPrefs]);
 
-  const handleSortByChange = (sortBy: SortBy) => {
+  const handleSortByChange = useCallback((sortBy: SortBy) => {
     setPrefs((prev) => ({ ...prev, sortBy }));
-  };
+  }, [setPrefs]);
 
-  const handleTerminate = async (sessionId: string, instanceId: string) => {
+  const handleTerminate = useCallback(async (sessionId: string, instanceId: string) => {
     try {
       await terminateSession(sessionId, instanceId);
       refetch();
     } catch {
       // error surfaced inside useTerminateSession
     }
-  };
+  }, [terminateSession, refetch]);
 
-  const handleAbort = async (sessionId: string, instanceId: string) => {
+  const handleAbort = useCallback(async (sessionId: string, instanceId: string) => {
     try {
       await abortSession(sessionId, instanceId);
     } catch {
       // error surfaced inside useAbortSession
     }
-  };
+  }, [abortSession]);
 
-  const handleResume = async (sessionId: string) => {
+  const handleResume = useCallback(async (sessionId: string) => {
     try {
       const result = await resumeSession(sessionId);
       router.push(
@@ -85,18 +85,18 @@ function FleetPageInner() {
       // error surfaced inside useResumeSession
       refetch();
     }
-  };
+  }, [resumeSession, router, refetch]);
 
-  const handleDeleteRequest = (sessionId: string, instanceId: string) => {
+  const handleDeleteRequest = useCallback((sessionId: string, instanceId: string) => {
     const item = sessions.find((s) => s.session.id === sessionId);
     setDeleteTarget({
       sessionId,
       instanceId,
       title: item?.session.title || sessionId.slice(0, 12),
     });
-  };
+  }, [sessions]);
 
-  const handleDeleteConfirm = async () => {
+  const handleDeleteConfirm = useCallback(async () => {
     if (!deleteTarget) return;
     try {
       await deleteSession(deleteTarget.sessionId, deleteTarget.instanceId);
@@ -106,13 +106,13 @@ function FleetPageInner() {
     } finally {
       setDeleteTarget(null);
     }
-  };
+  }, [deleteTarget, deleteSession, refetch]);
 
-  const handleOpen = (directory: string, tool?: OpenTool) => {
+  const handleOpen = useCallback((directory: string, tool?: OpenTool) => {
     const t = tool ?? preferredTool;
     if (tool) setPreferredTool(t);
     openDirectory(directory, t);
-  };
+  }, [preferredTool, setPreferredTool, openDirectory]);
 
   // Apply workspace URL filter — resolves workspaceId to directory so that all
   // sessions sharing the same workspace directory are included.
