@@ -134,7 +134,7 @@ function FleetPageInner() {
   }, [workspaceFiltered, search]);
 
   // Apply sort within session arrays
-  const sortSessions = (items: SessionListItem[]): SessionListItem[] => {
+  const sortSessions = useCallback((items: SessionListItem[]): SessionListItem[] => {
     const sorted = [...items];
     if (prefs.sortBy === "recent") {
       sorted.sort((a, b) => b.session.time.created - a.session.time.created);
@@ -157,10 +157,16 @@ function FleetPageInner() {
       });
     }
     return sorted;
-  };
+  }, [prefs.sortBy]);
 
   // Derive workspace groups from filtered sessions
   const allWorkspaces = useWorkspaces(searchFiltered);
+
+  // Memoize sorted workspace groups to preserve object identity for React.memo
+  const sortedWorkspaceGroups = useMemo(
+    () => allWorkspaces.map((g) => ({ ...g, sessions: sortSessions(g.sessions) })),
+    [allWorkspaces, sortSessions]
+  );
 
   const liveCount = liveSummary?.activeSessions ?? sessions.filter((s) => s.activityStatus === "busy").length;
 
@@ -436,10 +442,10 @@ function FleetPageInner() {
     // Default: "directory" — render SessionGroup per workspace
     return (
       <div className="space-y-2">
-        {allWorkspaces.map((group) => (
+        {sortedWorkspaceGroups.map((group) => (
           <SessionGroup
               key={group.workspaceDirectory}
-              group={{ ...group, sessions: sortSessions(group.sessions) }}
+              group={group}
               onTerminate={handleTerminate}
               onResume={handleResume}
               onDelete={handleDeleteRequest}
