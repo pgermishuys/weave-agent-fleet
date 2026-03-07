@@ -4,8 +4,15 @@ import {
   onNotification,
   emitActivityStatus,
   onActivityStatus,
+  getListenerCounts,
+  stopListenerMonitoring,
 } from "@/lib/server/notification-emitter";
 import type { ActivityStatusPayload } from "@/lib/server/notification-emitter";
+
+// ─── Global teardown — stop the monitoring interval started on module load ────
+afterAll(() => {
+  stopListenerMonitoring();
+});
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -198,5 +205,29 @@ describe("activity status emitter", () => {
 
     unsubNotif();
     unsubActivity();
+  });
+});
+
+// ─── Listener monitoring tests ────────────────────────────────────────────────
+
+describe("listener monitoring", () => {
+  it("getListenerCounts returns correct counts", () => {
+    const before = getListenerCounts();
+
+    const unsubNotif = onNotification(() => {});
+    const unsubActivity1 = onActivityStatus(() => {});
+    const unsubActivity2 = onActivityStatus(() => {});
+
+    const counts = getListenerCounts();
+    expect(counts.notification).toBe(before.notification + 1);
+    expect(counts.activity_status).toBe(before.activity_status + 2);
+
+    unsubNotif();
+    unsubActivity1();
+    unsubActivity2();
+
+    const after = getListenerCounts();
+    expect(after.notification).toBe(before.notification);
+    expect(after.activity_status).toBe(before.activity_status);
   });
 });

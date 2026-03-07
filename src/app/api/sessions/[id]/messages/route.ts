@@ -58,9 +58,16 @@ export async function GET(
     if (after) {
       const afterIndex = allMessages.findIndex((m: { info: { id: string } }) => m.info.id === after);
       if (afterIndex === -1) {
-        // Cursor not found — return all messages (client will deduplicate)
-        const result = sliceMessages(allMessages, { limit, before });
-        return NextResponse.json(result, { status: 200 });
+        // Cursor not found (stale) — return ALL messages so the client can reconcile.
+        // Using sliceMessages here would silently under-fetch (capped at `limit`).
+        return NextResponse.json({
+          messages: allMessages,
+          pagination: {
+            hasMore: false,
+            oldestMessageId: allMessages.length > 0 ? allMessages[0].info.id : null,
+            totalCount: allMessages.length,
+          },
+        }, { status: 200 });
       }
       const messagesAfter = allMessages.slice(afterIndex + 1);
       return NextResponse.json({
