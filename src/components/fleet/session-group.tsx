@@ -83,6 +83,11 @@ export function SessionGroup({ group, onTerminate, onNewSession, onResume, onDel
     refetch();
   }, [group.sessions, terminateSession, refetch]);
 
+  const handleOpenVscode = useCallback(
+    (dir: string) => onOpen?.(dir, "vscode"),
+    [onOpen]
+  );
+
   const hasRunning = group.hasRunningSession;
 
   return (
@@ -185,7 +190,7 @@ export function SessionGroup({ group, onTerminate, onNewSession, onResume, onDel
                   onResume={onResume}
                   onDelete={onDelete}
                   onAbort={onAbort}
-                  onOpen={onOpen ? (dir) => onOpen(dir, "vscode") : undefined}
+                  onOpen={onOpen ? handleOpenVscode : undefined}
                   isResuming={resumingSessionId === item.session.id}
                 />
                 {children.length > 0 && (
@@ -199,7 +204,7 @@ export function SessionGroup({ group, onTerminate, onNewSession, onResume, onDel
                         onResume={onResume}
                         onDelete={onDelete}
                         onAbort={onAbort}
-                        onOpen={onOpen ? (dir) => onOpen(dir, "vscode") : undefined}
+                        onOpen={onOpen ? handleOpenVscode : undefined}
                         isResuming={resumingSessionId === child.session.id}
                       />
                     ))}

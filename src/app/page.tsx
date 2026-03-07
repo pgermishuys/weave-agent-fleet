@@ -212,7 +212,7 @@ function FleetPageInner() {
                        onTerminate={handleTerminate}
                        onResume={handleResume}
                        onDelete={handleDeleteRequest}
-                       onOpen={(dir) => handleOpen(dir)}
+                       onOpen={handleOpen}
                        onAbort={handleAbort}
                        isResuming={resumingSessionId === item.session.id}
                      />
@@ -224,7 +224,7 @@ function FleetPageInner() {
                          onTerminate={handleTerminate}
                          onResume={handleResume}
                          onDelete={handleDeleteRequest}
-                         onOpen={(dir) => handleOpen(dir)}
+                         onOpen={handleOpen}
                          onAbort={handleAbort}
                          isResuming={resumingSessionId === child.session.id}
                        />
@@ -280,7 +280,7 @@ function FleetPageInner() {
                        onTerminate={handleTerminate}
                        onResume={handleResume}
                        onDelete={handleDeleteRequest}
-                       onOpen={(dir) => handleOpen(dir)}
+                       onOpen={handleOpen}
                        onAbort={handleAbort}
                        isResuming={resumingSessionId === item.session.id}
                      />
@@ -292,7 +292,7 @@ function FleetPageInner() {
                          onTerminate={handleTerminate}
                          onResume={handleResume}
                          onDelete={handleDeleteRequest}
-                         onOpen={(dir) => handleOpen(dir)}
+                         onOpen={handleOpen}
                          onAbort={handleAbort}
                          isResuming={resumingSessionId === child.session.id}
                        />
@@ -340,7 +340,7 @@ function FleetPageInner() {
                        onTerminate={handleTerminate}
                        onResume={handleResume}
                        onDelete={handleDeleteRequest}
-                       onOpen={(dir) => handleOpen(dir)}
+                       onOpen={handleOpen}
                        onAbort={handleAbort}
                        isResuming={resumingSessionId === item.session.id}
                      />
@@ -352,7 +352,7 @@ function FleetPageInner() {
                          onTerminate={handleTerminate}
                          onResume={handleResume}
                          onDelete={handleDeleteRequest}
-                         onOpen={(dir) => handleOpen(dir)}
+                         onOpen={handleOpen}
                          onAbort={handleAbort}
                          isResuming={resumingSessionId === child.session.id}
                        />
@@ -398,7 +398,7 @@ function FleetPageInner() {
                 onTerminate={handleTerminate}
                 onResume={handleResume}
                 onDelete={handleDeleteRequest}
-                onOpen={(dir) => handleOpen(dir)}
+                onOpen={handleOpen}
                 onAbort={handleAbort}
                 isResuming={resumingSessionId === item.session.id}
               />
@@ -410,7 +410,7 @@ function FleetPageInner() {
                   onTerminate={handleTerminate}
                   onResume={handleResume}
                   onDelete={handleDeleteRequest}
-                  onOpen={(dir) => handleOpen(dir)}
+                  onOpen={handleOpen}
                   onAbort={handleAbort}
                   isResuming={resumingSessionId === child.session.id}
                 />
