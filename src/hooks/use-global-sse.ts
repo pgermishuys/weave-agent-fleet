@@ -13,7 +13,7 @@
  * callbacks based on the `type` field in the parsed data.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -178,12 +178,12 @@ export const _removeListener = removeListener;
  * On unmount: decrements subscriber count, disconnects if last subscriber.
  * Returns stable `on`/`off` methods for registering typed event callbacks.
  */
-export function useGlobalSSE(): SSESubscription {
-  const subscriptionRef = useRef<SSESubscription>({
-    on: addListener,
-    off: removeListener,
-  });
+const stableSubscription: SSESubscription = {
+  on: addListener,
+  off: removeListener,
+};
 
+export function useGlobalSSE(): SSESubscription {
   useEffect(() => {
     subscribe();
     return () => {
@@ -191,5 +191,5 @@ export function useGlobalSSE(): SSESubscription {
     };
   }, []);
 
-  return subscriptionRef.current;
+  return stableSubscription;
 }
