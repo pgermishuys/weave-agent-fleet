@@ -25,6 +25,7 @@ export interface ActivityStatusPayload {
 
 const _g = globalThis as unknown as {
   __weaveNotificationEmitter?: EventEmitter;
+  __weaveListenerMonitorInterval?: ReturnType<typeof setInterval> | null;
 };
 
 function getEmitter(): EventEmitter {
@@ -66,3 +67,47 @@ export function onActivityStatus(
     emitter.off("activity_status", callback);
   };
 }
+
+// ─── Listener monitoring ──────────────────────────────────────────────────────
+
+const LISTENER_WARN_THRESHOLD = 50;
+const LISTENER_MONITOR_INTERVAL_MS = 60_000;
+
+/** Get current listener counts by event type. */
+export function getListenerCounts(): { notification: number; activity_status: number } {
+  const emitter = getEmitter();
+  return {
+    notification: emitter.listenerCount("notification"),
+    activity_status: emitter.listenerCount("activity_status"),
+  };
+}
+
+/**
+ * Start periodic monitoring of listener counts.
+ * Warns when the total count exceeds the threshold — a possible leak indicator.
+ * Idempotent — only one monitor runs at a time.
+ */
+export function startListenerMonitoring(): void {
+  if (_g.__weaveListenerMonitorInterval) return;
+  _g.__weaveListenerMonitorInterval = setInterval(() => {
+    const counts = getListenerCounts();
+    const total = counts.notification + counts.activity_status;
+    if (total > LISTENER_WARN_THRESHOLD) {
+      console.warn(
+        `[notification-emitter] High listener count: ${total} (notification: ${counts.notification}, activity_status: ${counts.activity_status}). Possible leak.`
+      );
+    }
+  }, LISTENER_MONITOR_INTERVAL_MS);
+}
+
+/** Stop the listener monitoring interval. */
+export function stopListenerMonitoring(): void {
+  if (_g.__weaveListenerMonitorInterval) {
+    clearInterval(_g.__weaveListenerMonitorInterval);
+    _g.__weaveListenerMonitorInterval = null;
+  }
+}
+
+// ─── Self-initializing startup ────────────────────────────────────────────────
+// Start listener monitoring on module load (idempotent).
+startListenerMonitoring();
