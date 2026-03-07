@@ -49,6 +49,8 @@ export interface UseSessionEventsResult {
 const MAX_RECONNECT_DELAY_MS = 30_000;
 const BASE_RECONNECT_DELAY_MS = 1_000;
 const MAX_RECONNECT_ATTEMPTS = 5;
+/** Maximum messages held in memory — oldest are evicted when exceeded. */
+const MAX_MESSAGES = 500;
 
 export function useSessionEvents(
   sessionId: string,
@@ -79,6 +81,8 @@ export function useSessionEvents(
   // Keep onAgentSwitch in a ref to avoid stale closures in the event handler
   const onAgentSwitchRef = useRef(onAgentSwitch);
   useEffect(() => { onAgentSwitchRef.current = onAgentSwitch; }, [onAgentSwitch]);
+  // Track the last known message ID for incremental reconnect loading
+  const lastMessageIdRef = useRef<string | null>(null);
 
   /**
    * Fetch existing messages from the API and convert to AccumulatedMessage[].
@@ -96,13 +100,50 @@ export function useSessionEvents(
       if (!data.messages?.length) return;
 
       const accumulated = data.messages.map(convertSDKMessageToAccumulated);
-      setMessages(accumulated);
+      setMessages(
+        accumulated.length > MAX_MESSAGES
+          ? accumulated.slice(accumulated.length - MAX_MESSAGES)
+          : accumulated
+      );
       // Reset pagination state since we loaded everything
       resetPagination();
     } catch {
       // Best-effort — if loading fails, we still have the live stream
     }
   }, [sessionId, instanceId, resetPagination]);
+
+  /**
+   * Load only messages that arrived since the last known message.
+   * Falls back to loadAllMessages if there's no reference point or if the API call fails.
+   */
+  const loadMessagesSince = useCallback(async (afterId: string | null): Promise<void> => {
+    if (!sessionId || !instanceId) return;
+    if (!afterId) {
+      // No reference point — fall back to full load
+      return loadAllMessages();
+    }
+    try {
+      const url = `/api/sessions/${encodeURIComponent(sessionId)}/messages?instanceId=${encodeURIComponent(instanceId)}&after=${encodeURIComponent(afterId)}`;
+      const response = await fetch(url);
+      if (!response.ok) return loadAllMessages(); // fallback
+      const data = await response.json() as { messages?: SDKMessage[] };
+      if (!data.messages?.length) return; // no gap
+
+      const accumulated = data.messages.map(convertSDKMessageToAccumulated);
+      setMessages(prev => {
+        // Append new messages, avoiding duplicates
+        const existingIds = new Set(prev.map(m => m.messageId));
+        const newMessages = accumulated.filter(m => !existingIds.has(m.messageId));
+        const merged = [...prev, ...newMessages];
+        // Apply cap
+        return merged.length > MAX_MESSAGES
+          ? merged.slice(merged.length - MAX_MESSAGES)
+          : merged;
+      });
+    } catch {
+      return loadAllMessages(); // fallback on error
+    }
+  }, [sessionId, instanceId, loadAllMessages]);
 
   /**
    * Load the initial batch of messages (paginated — last N messages).
@@ -134,9 +175,9 @@ export function useSessionEvents(
       setReconnectAttempt(0);
 
       if (hasConnectedOnce.current) {
-        // Reconnect after a drop — recover state to fill gaps (fetch ALL messages)
+        // Reconnect after a drop — load only the gap since last known message
         setStatus("recovering");
-        loadAllMessages().then(() => {
+        loadMessagesSince(lastMessageIdRef.current).then(() => {
           if (isMounted.current) {
             setStatus("connected");
             setError(undefined);
@@ -159,7 +200,7 @@ export function useSessionEvents(
       } catch {
         return;
       }
-      handleEvent(event, sessionId, setMessages, setStatus, setSessionStatus, setError, onAgentSwitchRef);
+      handleEvent(event, sessionId, setMessages, setStatus, setSessionStatus, setError, onAgentSwitchRef, lastMessageIdRef);
     };
 
     es.onerror = () => {
@@ -183,7 +224,7 @@ export function useSessionEvents(
         return next;
       });
     };
-  }, [sessionId, instanceId, loadAllMessages, loadInitialMessages]);
+  }, [sessionId, instanceId, loadMessagesSince, loadInitialMessages]);
 
   useEffect(() => {
     connectRef.current = connect;
@@ -261,6 +302,7 @@ function handleEvent(
   setSessionStatus: SetSessionStatus,
   setError: SetError,
   onAgentSwitchRef: React.MutableRefObject<((agent: string) => void) | undefined>,
+  lastMessageIdRef: React.MutableRefObject<string | null>,
 ): void {
   const { type, properties } = event;
 
@@ -290,7 +332,14 @@ function handleEvent(
   if (type === "message.updated") {
     const info = properties?.info;
     if (!info?.id) return;
-    setMessages((prev) => mergeMessageUpdate(ensureMessage(prev, info), info));
+    lastMessageIdRef.current = info.id;
+    setMessages((prev) => {
+      const next = mergeMessageUpdate(ensureMessage(prev, info), info);
+      if (next.length > MAX_MESSAGES) {
+        return next.slice(next.length - MAX_MESSAGES);
+      }
+      return next;
+    });
     return;
   }
 
