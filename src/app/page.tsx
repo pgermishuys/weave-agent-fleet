@@ -452,6 +452,7 @@ function FleetPageInner() {
               onAbort={handleAbort}
               onOpen={handleOpen}
               resumingSessionId={resumingSessionId}
+              refetch={refetch}
             />
         ))}
       </div>

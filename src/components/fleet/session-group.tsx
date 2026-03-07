@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
+import React from "react";
 import { ChevronRight, MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import {
   Collapsible,
@@ -19,7 +20,6 @@ import { Button } from "@/components/ui/button";
 import { InlineEdit } from "@/components/ui/inline-edit";
 import { LiveSessionCard } from "@/components/fleet/live-session-card";
 import { useRenameWorkspace } from "@/hooks/use-rename-workspace";
-import { useSessionsContext } from "@/contexts/sessions-context";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useTerminateSession } from "@/hooks/use-terminate-session";
 import type { WorkspaceGroup } from "@/hooks/use-workspaces";
@@ -39,10 +39,10 @@ interface SessionGroupProps {
   onAbort?: (sessionId: string, instanceId: string) => void;
   onOpen?: (directory: string, tool: OpenTool) => void;
   resumingSessionId?: string | null;
+  refetch: () => void;
 }
 
-export function SessionGroup({ group, onTerminate, onNewSession, onResume, onDelete, onAbort, onOpen, resumingSessionId }: SessionGroupProps) {
-  const { refetch } = useSessionsContext();
+export const SessionGroup = React.memo(function SessionGroup({ group, onTerminate, onNewSession, onResume, onDelete, onAbort, onOpen, resumingSessionId, refetch }: SessionGroupProps) {
   const { renameWorkspace } = useRenameWorkspace();
   const { terminateSession } = useTerminateSession();
 
@@ -217,4 +217,4 @@ export function SessionGroup({ group, onTerminate, onNewSession, onResume, onDel
       </CollapsibleContent>
     </Collapsible>
   );
-}
+});
