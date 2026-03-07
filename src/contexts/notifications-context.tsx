@@ -13,6 +13,7 @@ import {
 import type { DbNotification } from "@/lib/server/db-repository";
 import { useBrowserNotifications } from "@/hooks/use-browser-notifications";
 import { useNotificationPreferences } from "@/hooks/use-notification-preferences";
+import { useGlobalSSE } from "@/hooks/use-global-sse";
 
 export type { DbNotification };
 
@@ -31,7 +32,6 @@ const NotificationsContext = createContext<NotificationsContextValue | null>(
 );
 
 const DEFAULT_POLL_INTERVAL_MS = 10_000;
-const SSE_RECONNECT_DELAY_MS = 5_000;
 
 interface NotificationsProviderProps {
   children: ReactNode;
@@ -52,9 +52,7 @@ export function NotificationsProvider({
   // setState calls from in-flight fetches or SSE events during those gaps.
   const isMounted = useRef(true);
 
-  const eventSourceRef = useRef<EventSource | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Guard ref: prevents SSE onmessage from resurrecting notifications
   // that are being cleared by clearAll. Set true before the DELETE call,
@@ -157,70 +155,42 @@ export function NotificationsProvider({
     }
   }, []);
 
-  const connectSSE = useCallback(() => {
-    if (eventSourceRef.current) return;
-    const es = new EventSource("/api/notifications/stream");
-    eventSourceRef.current = es;
+  // Subscribe to the shared SSE singleton for notification events.
+  // Reconnection is handled by the useGlobalSSE hook.
+  const sse = useGlobalSSE();
 
-    es.onopen = () => {
-      stopPolling(); // SSE connected — stop polling
-    };
-
-    es.onmessage = (e: MessageEvent<string>) => {
+  useEffect(() => {
+    function handleNotification(payload: unknown) {
       if (!isMounted.current) return;
       if (clearingRef.current) return; // Drop events during clearAll
-      try {
-        const data = JSON.parse(e.data) as {
-          type: string;
-          notification: DbNotification;
-        };
-        if (data.type === "notification" && data.notification) {
-          setUnreadCount((prev) => Math.min(prev + 1, 9999));
-          setNotifications((prev) =>
-            [data.notification, ...prev].slice(0, 50)
-          );
-        }
-      } catch {
-        /* ignore parse errors */
+      const data = payload as {
+        type: string;
+        notification: DbNotification;
+      };
+      if (data.notification) {
+        setUnreadCount((prev) => Math.min(prev + 1, 9999));
+        setNotifications((prev) =>
+          [data.notification, ...prev].slice(0, 50)
+        );
       }
-    };
+    }
 
-    es.onerror = () => {
-      if (!isMounted.current) return;
-      es.close();
-      eventSourceRef.current = null;
-      // Fallback to polling
-      fetchUnreadCount();
-      startPolling();
-      // Attempt SSE reconnect after delay
-      if (reconnectTimerRef.current) {
-        clearTimeout(reconnectTimerRef.current);
-        reconnectTimerRef.current = null;
-      }
-      reconnectTimerRef.current = setTimeout(() => {
-        reconnectTimerRef.current = null;
-        if (isMounted.current && !eventSourceRef.current) connectSSE();
-      }, SSE_RECONNECT_DELAY_MS);
+    sse.on("notification", handleNotification);
+    return () => {
+      sse.off("notification", handleNotification);
     };
-  }, [stopPolling, startPolling, fetchUnreadCount]);
+  }, [sse]);
 
-  // SSE + polling lifecycle
+  // Polling lifecycle — fetch unread count periodically as a fallback
   useEffect(() => {
     isMounted.current = true;
     fetchUnreadCount(); // Initial fetch
-    connectSSE(); // Try SSE first
-    startPolling(); // Start polling as initial fallback (SSE onopen will stop it)
+    startPolling();
     return () => {
       isMounted.current = false;
-      eventSourceRef.current?.close();
-      eventSourceRef.current = null;
-      if (reconnectTimerRef.current) {
-        clearTimeout(reconnectTimerRef.current);
-        reconnectTimerRef.current = null;
-      }
       stopPolling();
     };
-  }, [fetchUnreadCount, connectSSE, startPolling, stopPolling]);
+  }, [fetchUnreadCount, startPolling, stopPolling]);
 
   // Browser notification triggering — fires once here, not per consumer
   useEffect(() => {
