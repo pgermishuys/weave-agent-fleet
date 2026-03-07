@@ -35,6 +35,8 @@ import {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CALLBACK_POLL_INTERVAL_MS = 10_000;
+/** Stop polling after this many consecutive polls find no pending callbacks. */
+const MAX_EMPTY_POLLS = 3;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -61,6 +63,7 @@ const _g = globalThis as unknown as {
   };
   __weaveCallbackPollInterval?: ReturnType<typeof setInterval> | null;
   __weaveCallbackMonitorInit?: boolean;
+  __weaveCallbackConsecutiveEmptyPolls?: number;
 };
 
 function getMonitorState() {
@@ -271,6 +274,12 @@ export function startMonitoring(
     instanceId,
   });
 
+  // Restart polling loop if it was paused due to inactivity
+  if (!_g.__weaveCallbackPollInterval) {
+    _g.__weaveCallbackConsecutiveEmptyPolls = 0;
+    startCallbackPollingLoop();
+  }
+
   // Add to existing instance subscription or create new one
   let sub = instanceSubscriptions.get(instanceId);
   if (sub) {
@@ -390,7 +399,18 @@ export function startCallbackPollingLoop(): void {
   _g.__weaveCallbackPollInterval = setInterval(async () => {
     try {
       const pending = getAllPendingCallbacks();
-      if (pending.length === 0) return;
+      if (pending.length === 0) {
+        _g.__weaveCallbackConsecutiveEmptyPolls = (_g.__weaveCallbackConsecutiveEmptyPolls ?? 0) + 1;
+        if (_g.__weaveCallbackConsecutiveEmptyPolls >= MAX_EMPTY_POLLS) {
+          // No pending callbacks for several consecutive polls — pause the loop
+          if (_g.__weaveCallbackPollInterval) {
+            clearInterval(_g.__weaveCallbackPollInterval);
+            _g.__weaveCallbackPollInterval = null;
+          }
+        }
+        return;
+      }
+      _g.__weaveCallbackConsecutiveEmptyPolls = 0;
 
       // Group by source session's instance to batch status checks
       const byInstance = new Map<string, typeof pending>();
@@ -488,6 +508,7 @@ export function _resetForTests(): void {
     clearInterval(_g.__weaveCallbackPollInterval);
     _g.__weaveCallbackPollInterval = null;
   }
+  _g.__weaveCallbackConsecutiveEmptyPolls = 0;
   _g.__weaveCallbackMonitorInit = false;
 }
 
