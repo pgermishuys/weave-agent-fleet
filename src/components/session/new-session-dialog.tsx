@@ -12,7 +12,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, FolderOpen, GitBranch, Copy } from "lucide-react";
 import { useCreateSession } from "@/hooks/use-create-session";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import type { ReactNode } from "react";
@@ -23,6 +23,12 @@ const STRATEGY_LABELS: Record<IsolationStrategy, string> = {
   existing: "Existing Directory",
   worktree: "Git Worktree",
   clone: "Git Clone",
+};
+
+const STRATEGY_SHORT_LABELS: Record<IsolationStrategy, string> = {
+  existing: "Directory",
+  worktree: "Worktree",
+  clone: "Clone",
 };
 
 const DIRECTORY_LABELS: Record<IsolationStrategy, string> = {
@@ -42,6 +48,14 @@ const STRATEGY_DESCRIPTIONS: Record<IsolationStrategy, string> = {
   worktree: "Creates a git worktree — ideal for parallel work on the same repo.",
   clone: "Shallow-clones the repo — fully isolated ephemeral workspace.",
 };
+
+const STRATEGY_ICONS: Record<IsolationStrategy, typeof FolderOpen> = {
+  existing: FolderOpen,
+  worktree: GitBranch,
+  clone: Copy,
+};
+
+const STRATEGY_ORDER: IsolationStrategy[] = ["existing", "worktree", "clone"];
 
 interface NewSessionDialogProps {
   trigger?: ReactNode;
@@ -108,22 +122,31 @@ export function NewSessionDialog({ trigger, open: controlledOpen, onOpenChange, 
         <form onSubmit={handleSubmit} className="space-y-4 mt-6">
           {/* Isolation Strategy */}
           <div className="space-y-1.5">
-            <label className="text-sm font-medium" htmlFor="isolation-strategy">
+            <label className="text-sm font-medium">
               Isolation Strategy
             </label>
-            <select
-              id="isolation-strategy"
-              value={isolationStrategy}
-              onChange={(e) => setIsolationStrategy(e.target.value as IsolationStrategy)}
-              disabled={isLoading}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {(Object.keys(STRATEGY_LABELS) as IsolationStrategy[]).map((s) => (
-                <option key={s} value={s}>
-                  {STRATEGY_LABELS[s]}
-                </option>
-              ))}
-            </select>
+            <div className="flex gap-1">
+              {STRATEGY_ORDER.map((s) => {
+                const Icon = STRATEGY_ICONS[s];
+                const isActive = isolationStrategy === s;
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setIsolationStrategy(s)}
+                    disabled={isLoading}
+                    className={`flex-1 flex flex-col items-center justify-center rounded-md border px-3 py-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                      isActive
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-input bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span className="text-xs mt-1">{STRATEGY_SHORT_LABELS[s]}</span>
+                  </button>
+                );
+              })}
+            </div>
             <p className="text-xs text-muted-foreground">
               {STRATEGY_DESCRIPTIONS[isolationStrategy]}
             </p>
