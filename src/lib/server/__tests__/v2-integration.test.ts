@@ -370,8 +370,12 @@ describe("worktree isolation — end-to-end lifecycle", () => {
     const repo = trackDir(makeGitRepo());
     const ws = await createWorkspace({ sourceDirectory: repo, strategy: "worktree" });
 
-    // Worktree directory was created
+    // Worktree directory was created as a sibling of the source repo
     expect(existsSync(ws.directory)).toBe(true);
+    expect(resolve(join(ws.directory, ".."))).toBe(resolve(join(repo, "..")));
+
+    // Track the worktree directory for cleanup in case test fails
+    trackDir(ws.directory);
 
     // It's a valid git checkout (not just a plain directory)
     const gitDir = execSync("git rev-parse --git-dir", {
@@ -381,11 +385,12 @@ describe("worktree isolation — end-to-end lifecycle", () => {
     expect(gitDir).toBeTruthy();
 
     // The worktree appears in `git worktree list`
+    // Note: git outputs forward slashes on Windows, so normalize for comparison
     const worktreeList = execSync("git worktree list --porcelain", {
       cwd: repo,
       encoding: "utf-8",
-    });
-    expect(worktreeList).toContain(resolve(ws.directory));
+    }).replace(/\\/g, "/");
+    expect(worktreeList).toContain(resolve(ws.directory).replace(/\\/g, "/"));
 
     // Cleanup removes the worktree
     await cleanupWorkspace(ws.id);
@@ -395,8 +400,8 @@ describe("worktree isolation — end-to-end lifecycle", () => {
     const afterList = execSync("git worktree list --porcelain", {
       cwd: repo,
       encoding: "utf-8",
-    });
-    expect(afterList).not.toContain(resolve(ws.directory));
+    }).replace(/\\/g, "/");
+    expect(afterList).not.toContain(resolve(ws.directory).replace(/\\/g, "/"));
   });
 
   it("WorktreeUsesCustomBranch", async () => {
@@ -410,10 +415,19 @@ describe("worktree isolation — end-to-end lifecycle", () => {
       branch: "feature/test-worktree",
     });
 
+    // Track the worktree directory for cleanup in case test fails
+    trackDir(ws.directory);
+
     const dbWs = getWorkspace(ws.id);
     expect(dbWs?.branch).toBe("feature/test-worktree");
     expect(dbWs?.isolation_strategy).toBe("worktree");
     expect(dbWs?.source_directory).toBe(resolve(repo));
+
+    // Worktree directory should use the repo name + hyphenated branch name
+    const repoName = repo.split(/[/\\]/).pop()!;
+    const expectedDirName = `${repoName}-feature-test-worktree`;
+    const actualDirName = ws.directory.split(/[/\\]/).pop()!;
+    expect(actualDirName).toBe(expectedDirName);
 
     // Check the branch exists in the worktree
     const currentBranch = execSync("git branch --show-current", {

@@ -3,17 +3,19 @@
  *
  * Supports three isolation strategies:
  * - `existing`: use a user-specified directory as-is (no copy/clone)
- * - `worktree`: create a git worktree from a source repo (same-repo parallelism)
+ * - `worktree`: create a git worktree as a sibling of the source repo (same-repo parallelism)
  * - `clone`: shallow-clone a git repo into a new workspace directory (ephemeral)
  *
- * Workspaces for worktree and clone strategies are created under a configurable root
- * directory (WEAVE_WORKSPACE_ROOT env var, default ~/.weave/workspaces/).
+ * Worktree directories are placed alongside the source repo with the naming convention
+ * `{repo-name}-{hyphenated-branch-name}` (e.g. `my-project-feature-auth`).
+ * Clone workspaces are created under a configurable root directory
+ * (WEAVE_WORKSPACE_ROOT env var, default ~/.weave/workspaces/).
  */
 
 import { execFileSync } from "child_process";
 import { existsSync, mkdirSync, rmSync, statSync } from "fs";
 import { homedir } from "os";
-import { join, resolve } from "path";
+import { basename, dirname, join, resolve } from "path";
 import { randomUUID } from "crypto";
 import {
   insertWorkspace,
@@ -113,11 +115,16 @@ export async function createWorkspace(
         );
       }
 
-      const workspaceRoot = getWorkspaceRoot();
-      mkdirSync(workspaceRoot, { recursive: true });
-
-      const workspaceDir = join(workspaceRoot, id);
       const branchName = branch ?? `weave-session-${id.slice(0, 8)}`;
+
+      // Place worktree as a sibling of the source repo directory.
+      // Naming: {repo-name}-{hyphenated-branch-name}
+      // e.g. source "C:\repos\my-project" + branch "feature/auth" → "C:\repos\my-project-feature-auth"
+      const repoName = basename(sourceDirectory);
+      const hyphenatedBranch = branchName.replace(/[/\\]/g, "-");
+      const worktreeDirName = `${repoName}-${hyphenatedBranch}`;
+      const parentDir = dirname(sourceDirectory);
+      const workspaceDir = join(parentDir, worktreeDirName);
 
       execFileSync(
         "git", ["worktree", "add", workspaceDir, "-b", branchName],
