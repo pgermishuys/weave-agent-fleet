@@ -6,12 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DirectoryPicker } from "@/components/session/directory-picker";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Loader2, AlertCircle, FolderOpen, GitBranch, Copy } from "lucide-react";
 import { useCreateSession } from "@/hooks/use-create-session";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -112,14 +112,14 @@ export function NewSessionDialog({ trigger, open: controlledOpen, onOpenChange, 
   };
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      {trigger && <SheetTrigger asChild>{trigger}</SheetTrigger>}
-      <SheetContent side="right" className="w-full max-w-sm">
-        <SheetHeader>
-          <SheetTitle>New Session</SheetTitle>
-        </SheetHeader>
+    <Dialog open={open} onOpenChange={setOpen}>
+      {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>New Session</DialogTitle>
+        </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 mt-6">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {/* Isolation Strategy */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium">
@@ -223,7 +223,7 @@ export function NewSessionDialog({ trigger, open: controlledOpen, onOpenChange, 
             )}
           </Button>
         </form>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
