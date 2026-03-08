@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { NewSessionDialog } from "@/components/session/new-session-dialog";
 import { NotificationBell } from "@/components/notifications/notification-bell";
+import { useCurrentSessionDirectory } from "@/hooks/use-current-session-directory";
 
 interface HeaderProps {
   title: string;
@@ -29,8 +30,10 @@ export function Header({ title, subtitle, actions }: HeaderProps) {
 }
 
 export function NewSessionButton() {
+  const currentDirectory = useCurrentSessionDirectory();
   return (
     <NewSessionDialog
+      defaultDirectory={currentDirectory}
       trigger={
         <Button size="sm" className="gap-1.5 weave-gradient-bg hover:opacity-90 border-0">
           <Plus className="h-3.5 w-3.5" />

@@ -33,6 +33,7 @@ import {
 import { useSidebarResize } from "@/hooks/use-sidebar-resize";
 import { SidebarWorkspaceItem } from "@/components/layout/sidebar-workspace-item";
 import { NewSessionDialog } from "@/components/session/new-session-dialog";
+import { useCurrentSessionDirectory } from "@/hooks/use-current-session-directory";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -48,6 +49,7 @@ export function Sidebar() {
     setIsResizing,
   } = useSidebar();
   const treeRef = useRef<HTMLDivElement>(null);
+  const currentDirectory = useCurrentSessionDirectory();
 
   const handleResizeStart = useCallback(() => {
     setIsResizing(true);
@@ -212,6 +214,7 @@ export function Sidebar() {
               <TooltipTrigger asChild>
                 <span>
                   <NewSessionDialog
+                    defaultDirectory={currentDirectory}
                     trigger={
                       <button
                         className="flex w-full items-center justify-center rounded-md py-2 text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground transition-colors"
@@ -261,6 +264,7 @@ export function Sidebar() {
                 <TooltipTrigger asChild>
                   <span className="shrink-0">
                     <NewSessionDialog
+                      defaultDirectory={currentDirectory}
                       trigger={
                         <button
                           className="rounded-md p-1 text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground transition-colors"

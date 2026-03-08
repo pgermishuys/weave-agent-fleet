@@ -6,12 +6,14 @@ import { useCommandRegistry } from "@/contexts/command-registry-context";
 import { useSessionsContext } from "@/contexts/sessions-context";
 import { NewSessionDialog } from "@/components/session/new-session-dialog";
 import { useKeybindings } from "@/contexts/keybindings-context";
+import { useCurrentSessionDirectory } from "@/hooks/use-current-session-directory";
 
 export function SessionCommands() {
   const { registerCommand, unregisterCommand } = useCommandRegistry();
   const { refetch } = useSessionsContext();
   const { bindings } = useKeybindings();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const currentDirectory = useCurrentSessionDirectory();
 
   const openNewSession = useCallback(() => setDialogOpen(true), []);
   const refreshSessions = useCallback(() => refetch(), [refetch]);
@@ -43,6 +45,6 @@ export function SessionCommands() {
   }, [registerCommand, unregisterCommand, bindings, openNewSession, refreshSessions]);
 
   return (
-    <NewSessionDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+    <NewSessionDialog open={dialogOpen} onOpenChange={setDialogOpen} defaultDirectory={currentDirectory} />
   );
 }
