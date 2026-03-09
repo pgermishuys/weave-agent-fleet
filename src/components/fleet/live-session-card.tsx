@@ -39,7 +39,7 @@ export const LiveSessionCard = React.memo(function LiveSessionCard({
 
   // Session status: purely about agent activity
   const isBusy = activityStatus === "busy";
-  const sessionStatusDot = isBusy ? "bg-green-500 animate-pulse" : "bg-slate-400";
+  const sessionStatusDot = isBusy ? "bg-green-500 animate-pulse" : "bg-muted-foreground/50";
   const sessionStatusLabel = isBusy ? "working" : "idle";
   const badgeVariant: "destructive" | "secondary" | "outline" = "secondary";
 
@@ -88,7 +88,7 @@ export const LiveSessionCard = React.memo(function LiveSessionCard({
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <span className="text-purple-400 cursor-default">
+                      <span className="text-purple-600 dark:text-purple-400 cursor-default">
                         {isolationStrategy === "worktree" ? (
                           <GitBranch className="h-3 w-3" />
                         ) : (
@@ -101,12 +101,12 @@ export const LiveSessionCard = React.memo(function LiveSessionCard({
                 </TooltipProvider>
               )}
               {isParent && (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-cyan-400 border-cyan-400/40">
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-cyan-600 dark:text-cyan-400 border-cyan-600/40 dark:border-cyan-400/40">
                   conductor
                 </Badge>
               )}
               {isChild && (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-orange-400 border-orange-400/40">
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-orange-600 dark:text-orange-400 border-orange-600/40 dark:border-orange-400/40">
                   child
                 </Badge>
               )}
@@ -162,7 +162,7 @@ export const LiveSessionCard = React.memo(function LiveSessionCard({
         <Button
           variant="ghost"
           size="icon"
-          className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-500 hover:bg-red-500/10"
+          className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-red-600 dark:text-red-400 hover:text-red-500 hover:bg-red-500/10"
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();

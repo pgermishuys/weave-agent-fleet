@@ -137,6 +137,76 @@
   --sidebar-ring: #A855F7;
 }
 
+/* Dark (Black) — OLED theme */
+.theme-black {
+  --background: #000000;
+  --foreground: #FAFAFA;
+  --card: #0A0A0A;
+  --card-foreground: #FAFAFA;
+  --popover: #0A0A0A;
+  --popover-foreground: #FAFAFA;
+  --primary: #A855F7;
+  --primary-foreground: #FFFFFF;
+  --secondary: #1A1A1A;
+  --secondary-foreground: #FAFAFA;
+  --muted: #1A1A1A;
+  --muted-foreground: #A1A1AA;
+  --accent: #1A1A1A;
+  --accent-foreground: #FAFAFA;
+  --destructive: #EF4444;
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.1);
+  --ring: #A855F7;
+  --chart-1: #3B82F6;
+  --chart-2: #A855F7;
+  --chart-3: #EC4899;
+  --chart-4: #22C55E;
+  --chart-5: #F59E0B;
+  --sidebar: #000000;
+  --sidebar-foreground: #FAFAFA;
+  --sidebar-primary: #A855F7;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #141414;
+  --sidebar-accent-foreground: #FAFAFA;
+  --sidebar-border: rgba(255, 255, 255, 0.06);
+  --sidebar-ring: #A855F7;
+}
+
+/* Light theme */
+.theme-light {
+  --background: #FFFFFF;
+  --foreground: #0F172A;
+  --card: #FFFFFF;
+  --card-foreground: #0F172A;
+  --popover: #FFFFFF;
+  --popover-foreground: #0F172A;
+  --primary: #9333EA;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F1F5F9;
+  --secondary-foreground: #0F172A;
+  --muted: #F1F5F9;
+  --muted-foreground: #64748B;
+  --accent: #F1F5F9;
+  --accent-foreground: #0F172A;
+  --destructive: #DC2626;
+  --border: #E2E8F0;
+  --input: #E2E8F0;
+  --ring: #9333EA;
+  --chart-1: #2563EB;
+  --chart-2: #9333EA;
+  --chart-3: #DB2777;
+  --chart-4: #16A34A;
+  --chart-5: #D97706;
+  --sidebar: #F8FAFC;
+  --sidebar-foreground: #0F172A;
+  --sidebar-primary: #9333EA;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #E2E8F0;
+  --sidebar-accent-foreground: #0F172A;
+  --sidebar-border: #E2E8F0;
+  --sidebar-ring: #9333EA;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -160,6 +230,14 @@
 
 .weave-gradient-border {
   border-image: linear-gradient(135deg, #3B82F6, #A855F7, #EC4899) 1;
+}
+
+/* Light theme: darker gradient stops for WCAG contrast on white */
+.theme-light .weave-gradient-text {
+  background: linear-gradient(135deg, #2563EB, #7C3AED, #DB2777);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 /* ─── Markdown prose (Weave dark theme) ─────────────────────────────────── */
@@ -187,4 +265,85 @@
 .prose-weave table th {
   background: var(--muted);
   font-weight: 600;
+}
+
+/* ─── Light theme: GitHub Light highlight.js overrides ──────────────────── */
+/* Overrides the imported github-dark.css when .theme-light is active       */
+
+.theme-light .hljs {
+  color: #24292e;
+  background: transparent;
+}
+.theme-light .hljs-doctag,
+.theme-light .hljs-keyword,
+.theme-light .hljs-meta .hljs-keyword,
+.theme-light .hljs-template-tag,
+.theme-light .hljs-template-variable,
+.theme-light .hljs-type,
+.theme-light .hljs-variable.language_ {
+  color: #d73a49;
+}
+.theme-light .hljs-title,
+.theme-light .hljs-title.class_,
+.theme-light .hljs-title.class_.inherited__,
+.theme-light .hljs-title.function_ {
+  color: #6f42c1;
+}
+.theme-light .hljs-attr,
+.theme-light .hljs-attribute,
+.theme-light .hljs-literal,
+.theme-light .hljs-meta,
+.theme-light .hljs-number,
+.theme-light .hljs-operator,
+.theme-light .hljs-variable,
+.theme-light .hljs-selector-attr,
+.theme-light .hljs-selector-class,
+.theme-light .hljs-selector-id {
+  color: #005cc5;
+}
+.theme-light .hljs-regexp,
+.theme-light .hljs-string,
+.theme-light .hljs-meta .hljs-string {
+  color: #032f62;
+}
+.theme-light .hljs-built_in,
+.theme-light .hljs-symbol {
+  color: #e36209;
+}
+.theme-light .hljs-comment,
+.theme-light .hljs-code,
+.theme-light .hljs-formula {
+  color: #6a737d;
+}
+.theme-light .hljs-name,
+.theme-light .hljs-quote,
+.theme-light .hljs-selector-tag,
+.theme-light .hljs-selector-pseudo {
+  color: #22863a;
+}
+.theme-light .hljs-subst {
+  color: #24292e;
+}
+.theme-light .hljs-section {
+  color: #005cc5;
+  font-weight: bold;
+}
+.theme-light .hljs-bullet {
+  color: #735c0f;
+}
+.theme-light .hljs-emphasis {
+  color: #24292e;
+  font-style: italic;
+}
+.theme-light .hljs-strong {
+  color: #24292e;
+  font-weight: bold;
+}
+.theme-light .hljs-addition {
+  color: #22863a;
+  background-color: #f0fff4;
+}
+.theme-light .hljs-deletion {
+  color: #b31d28;
+  background-color: #ffeef0;
 }

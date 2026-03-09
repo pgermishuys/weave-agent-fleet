@@ -83,7 +83,7 @@ export function ProvidersTab() {
                 {provider.connected ? (
                   <Badge
                     variant="secondary"
-                    className="text-[10px] bg-green-500/10 text-green-400"
+                    className="text-[10px] bg-green-500/10 text-green-600 dark:text-green-400"
                   >
                     <Wifi className="h-3 w-3 mr-1" />
                     Connected

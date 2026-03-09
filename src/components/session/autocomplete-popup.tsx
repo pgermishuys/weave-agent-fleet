@@ -127,7 +127,7 @@ export function AutocompletePopup({
 
           {/* Error state */}
           {error && !isLoading && (
-            <div role="alert" className="px-3 py-2 text-xs text-red-400">
+            <div role="alert" className="px-3 py-2 text-xs text-red-600 dark:text-red-400">
               {error}
             </div>
           )}

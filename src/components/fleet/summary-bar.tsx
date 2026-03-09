@@ -23,7 +23,7 @@ export function SummaryBar({ summary }: SummaryBarProps) {
       label: "Idle",
       value: summary.idleSessions,
       icon: Pause,
-      color: "text-zinc-400",
+      color: "text-muted-foreground",
     },
     {
       label: "Tokens",

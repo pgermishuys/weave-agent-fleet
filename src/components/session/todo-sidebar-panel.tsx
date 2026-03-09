@@ -14,9 +14,9 @@ function StatusIcon({ status }: { status: TodoItem["status"] }) {
     case "completed":
       return <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-green-500 mt-0.5" />;
     case "in_progress":
-      return <Loader2 className="h-3.5 w-3.5 shrink-0 text-blue-400 animate-spin mt-0.5" />;
+      return <Loader2 className="h-3.5 w-3.5 shrink-0 text-blue-600 dark:text-blue-400 animate-spin mt-0.5" />;
     case "cancelled":
-      return <XCircle className="h-3.5 w-3.5 shrink-0 text-red-400/60 mt-0.5" />;
+      return <XCircle className="h-3.5 w-3.5 shrink-0 text-red-600/60 dark:text-red-400/60 mt-0.5" />;
     default:
       return <Circle className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50 mt-0.5" />;
   }
@@ -25,9 +25,9 @@ function StatusIcon({ status }: { status: TodoItem["status"] }) {
 function PriorityBadge({ priority }: { priority: TodoItem["priority"] }) {
   const className =
     priority === "high"
-      ? "text-red-400 border-red-400/30"
+      ? "text-red-600 dark:text-red-400 border-red-400/30"
       : priority === "medium"
-      ? "text-amber-400 border-amber-400/30"
+      ? "text-amber-600 dark:text-amber-400 border-amber-400/30"
       : "text-muted-foreground border-border";
 
   return (

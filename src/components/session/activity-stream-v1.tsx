@@ -333,7 +333,7 @@ export function ActivityStreamV1({
           {onReconnect && (
             <button
               onClick={onReconnect}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 transition-colors"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-500/20 hover:bg-amber-500/30 text-amber-600 dark:text-amber-400 transition-colors"
             >
               <RefreshCw className="h-3 w-3" />
               Reconnect Now
@@ -342,7 +342,7 @@ export function ActivityStreamV1({
         </div>
       )}
       {status === "error" && error && (
-        <div className="px-4 py-2 bg-red-500/10 border-b border-red-500/20 text-xs text-red-400 flex items-center gap-2">
+        <div className="px-4 py-2 bg-red-500/10 border-b border-red-500/20 text-xs text-red-600 dark:text-red-400 flex items-center gap-2">
           <AlertCircle className="h-3.5 w-3.5" />
           {error}
         </div>
@@ -382,7 +382,7 @@ export function ActivityStreamV1({
               </div>
             )}
             {loadOlderError && !isLoadingOlder && (
-              <div className="flex items-center justify-center py-2 text-xs text-red-400 gap-1.5">
+              <div className="flex items-center justify-center py-2 text-xs text-red-600 dark:text-red-400 gap-1.5">
                 <AlertCircle className="h-3 w-3" />
                 <span>{loadOlderError} — scroll up to retry</span>
               </div>

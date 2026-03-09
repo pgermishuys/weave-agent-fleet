@@ -51,7 +51,7 @@ export const SidebarSessionItem = React.memo(function SidebarSessionItem({ item,
 
   // Session status: purely about agent activity
   const isBusy = activityStatus === "busy";
-  const sessionStatusDot = isBusy ? "bg-green-500 animate-pulse" : "bg-slate-400";
+  const sessionStatusDot = isBusy ? "bg-green-500 animate-pulse" : "bg-muted-foreground/50";
 
   // Connection status: only shown when unhealthy
   const ConnectionIcon = isDisconnected

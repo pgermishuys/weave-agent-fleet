@@ -82,7 +82,7 @@ export function SkillCard({
                   variant={isAssigned ? "default" : "outline"}
                   className={`text-[10px] transition-colors ${
                     isAssigned
-                      ? "bg-blue-500/20 text-blue-400 border-blue-500/30 hover:bg-blue-500/30"
+                      ? "bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/30 hover:bg-blue-500/30"
                       : "text-muted-foreground hover:text-foreground hover:border-foreground/30"
                   }`}
                 >

@@ -151,7 +151,7 @@ export function CollapsibleToolCall({ part }: CollapsibleToolCallProps) {
                   )}
                 </button>
               </div>
-              <div className={`bg-muted/30 rounded px-2 py-1.5 overflow-x-auto ${isError ? "text-red-400" : ""}`}>
+              <div className={`bg-muted/30 rounded px-2 py-1.5 overflow-x-auto ${isError ? "text-red-600 dark:text-red-400" : ""}`}>
                 <FormattedOutput value={isError ? error : output} />
               </div>
             </div>

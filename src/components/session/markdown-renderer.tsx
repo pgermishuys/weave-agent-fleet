@@ -70,8 +70,8 @@ function CodeBlock({ children, ...rest }: PreProps) {
         >
           {copied ? (
             <>
-              <Check className="h-3 w-3 text-green-400" />
-              <span className="text-green-400">Copied!</span>
+              <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
+              <span className="text-green-600 dark:text-green-400">Copied!</span>
             </>
           ) : (
             <Copy className="h-3 w-3" />

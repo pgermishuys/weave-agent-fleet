@@ -278,7 +278,7 @@ export default function SessionDetailPage() {
               className={`h-2 w-2 rounded-full ${
                 sessionStatus === "busy"
                   ? "bg-green-500 animate-pulse"
-                  : "bg-slate-400"
+                  : "bg-muted-foreground/50"
               }`}
             />
             <Badge variant="secondary" className="text-xs">
@@ -343,7 +343,7 @@ export default function SessionDetailPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 px-2 text-xs gap-1 text-red-400 hover:text-red-500 hover:bg-red-500/10"
+                className="h-7 px-2 text-xs gap-1 text-red-600 dark:text-red-400 hover:text-red-500 hover:bg-red-500/10"
                 onClick={() => setShowDeleteConfirm(true)}
               >
                 <Trash2 className="h-3 w-3" />
@@ -357,13 +357,13 @@ export default function SessionDetailPage() {
         {/* Main content with tabs */}
         <div className="flex flex-1 flex-col overflow-hidden">
           {isStopped && (
-            <div className="px-4 py-2 bg-slate-500/10 border-b border-slate-500/20 text-sm text-slate-400 text-center">
+            <div className="px-4 py-2 bg-muted/50 border-b border-border text-sm text-muted-foreground text-center">
               Session stopped — conversation history preserved above.
             </div>
           )}
           {isResumable && !isStopped && (
             <div className="px-4 py-3 bg-amber-500/10 border-b border-amber-500/20 flex items-center justify-between">
-              <span className="text-sm text-amber-400">
+              <span className="text-sm text-amber-600 dark:text-amber-400">
                 Session disconnected — the opencode instance is no longer running.
               </span>
               <Button
@@ -385,7 +385,7 @@ export default function SessionDetailPage() {
               if (value === "changes") fetchDiffs();
             }}
           >
-            <TabsList variant="line" className="px-4 border-b border-white/10">
+            <TabsList variant="line" className="px-4 border-b border-border/50">
               <TabsTrigger value="activity">Activity</TabsTrigger>
               <TabsTrigger value="changes" className="gap-1.5">
                 <GitCompare className="h-3.5 w-3.5" />
@@ -561,7 +561,7 @@ export default function SessionDetailPage() {
                   {status === "error" ? (
                     <AlertTriangle className="h-3 w-3 text-red-500 shrink-0" />
                   ) : status === "disconnected" || status === "abandoned" ? (
-                    <AlertTriangle className="h-3 w-3 text-amber-400 shrink-0" />
+                    <AlertTriangle className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0" />
                   ) : (
                     <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${
                       status === "connected" ? "bg-green-500" :
@@ -572,7 +572,7 @@ export default function SessionDetailPage() {
                   )}
                   <p className={`text-xs ${
                     status === "error" ? "text-red-500 font-medium" :
-                    status === "disconnected" || status === "abandoned" ? "text-amber-400" :
+                    status === "disconnected" || status === "abandoned" ? "text-amber-600 dark:text-amber-400" :
                     ""
                   }`}>
                     {status === "error" ? "Error" :
@@ -588,14 +588,14 @@ export default function SessionDetailPage() {
                 {(status === "disconnected" || status === "abandoned") && (
                   <button
                     onClick={reconnect}
-                    className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 transition-colors"
+                    className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 transition-colors"
                   >
                     <RefreshCw className="h-2.5 w-2.5" />
                     Reconnect
                   </button>
                 )}
                 {status === "error" && error && (
-                  <p className="text-[10px] text-red-400/70 break-words mt-0.5">{error}</p>
+                  <p className="text-[10px] text-red-600/70 dark:text-red-400/70 break-words mt-0.5">{error}</p>
                 )}
               </div>
 

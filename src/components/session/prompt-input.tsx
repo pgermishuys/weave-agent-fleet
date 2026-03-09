@@ -156,7 +156,7 @@ export function PromptInput({
       />
 
       {sendError && (
-        <div className="flex items-center gap-2 rounded-md bg-red-500/10 border border-red-500/20 px-3 py-1.5 text-xs text-red-400">
+        <div className="flex items-center gap-2 rounded-md bg-red-500/10 border border-red-500/20 px-3 py-1.5 text-xs text-red-600 dark:text-red-400">
           <AlertCircle className="h-3.5 w-3.5 shrink-0" />
           <span>{sendError}</span>
         </div>

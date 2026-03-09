@@ -87,7 +87,7 @@ function KeyRecorder({ type, onCapture, onCancel }: KeyRecorderProps) {
   }, [type, onCapture, onCancel]);
 
   return (
-    <span className="text-xs animate-pulse text-amber-400">Press a key…</span>
+    <span className="text-xs animate-pulse text-amber-600 dark:text-amber-400">Press a key…</span>
   );
 }
 
@@ -159,7 +159,7 @@ function BindingCell({
         )}
       </button>
       {conflict && (
-        <p className="text-[10px] text-amber-400">
+        <p className="text-[10px] text-amber-600 dark:text-amber-400">
           Conflicts with &quot;{conflict.conflictingCommandId}&quot;
         </p>
       )}

@@ -15,7 +15,7 @@ function getStatusDot(status: string): string {
     case "active":
       return "bg-green-500";
     case "idle":
-      return "bg-zinc-400";
+      return "bg-muted-foreground/50";
     case "stopped":
       return "bg-red-500";
     case "completed":
@@ -23,7 +23,7 @@ function getStatusDot(status: string): string {
     case "disconnected":
       return "bg-amber-500";
     default:
-      return "bg-zinc-500";
+      return "bg-muted-foreground/60";
   }
 }
 
@@ -32,7 +32,7 @@ function getStatusColor(status: string): string {
     case "active":
       return "text-green-500";
     case "idle":
-      return "text-zinc-400";
+      return "text-muted-foreground";
     case "stopped":
       return "text-red-500";
     case "completed":
@@ -40,7 +40,7 @@ function getStatusColor(status: string): string {
     case "disconnected":
       return "text-amber-500";
     default:
-      return "text-zinc-500";
+      return "text-muted-foreground";
   }
 }
 

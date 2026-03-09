@@ -486,7 +486,7 @@ function FleetPageInner() {
         )}
 
         {error && (
-          <div className="rounded-md bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400">
+          <div className="rounded-md bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-600 dark:text-red-400">
             Failed to load sessions: {error}
           </div>
         )}

@@ -114,7 +114,7 @@ export const SessionGroup = React.memo(function SessionGroup({ group, onTerminat
         <span
           className={cn(
             "h-2 w-2 rounded-full shrink-0",
-            hasRunning ? "bg-green-500 animate-pulse" : "bg-slate-500"
+            hasRunning ? "bg-green-500 animate-pulse" : "bg-muted-foreground/60"
           )}
         />
 

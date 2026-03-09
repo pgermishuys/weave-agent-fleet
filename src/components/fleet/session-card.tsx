@@ -49,7 +49,7 @@ function getAgentColor(agent: string): string {
     case "spindle": return "bg-[#F39C12]/10 text-[#F39C12]";
     case "weft": return "bg-[#1ABC9C]/10 text-[#1ABC9C]";
     case "warp": return "bg-[#E74C3C]/10 text-[#E74C3C]";
-    default: return "bg-zinc-500/10 text-zinc-500";
+    default: return "bg-muted-foreground/10 text-muted-foreground";
   }
 }
 

@@ -55,7 +55,7 @@ export function AboutTab() {
                 {versionInfo?.updateAvailable && (
                   <Badge
                     variant="secondary"
-                    className="text-[10px] bg-blue-500/10 text-blue-400"
+                    className="text-[10px] bg-blue-500/10 text-blue-600 dark:text-blue-400"
                   >
                     Update available: v{versionInfo.latest}
                   </Badge>
@@ -102,7 +102,7 @@ export function AboutTab() {
               href="https://github.com/pgermishuys/weave-agent-fleet"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300 transition-colors"
+              className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 transition-colors"
             >
               <ExternalLink className="h-3.5 w-3.5" />
               GitHub Repository

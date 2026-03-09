@@ -8,6 +8,7 @@ import { ProvidersTab } from "@/components/settings/providers-tab";
 import { NotificationsTab } from "@/components/settings/notifications-tab";
 import { AboutTab } from "@/components/settings/about-tab";
 import { KeybindingsTab } from "@/components/settings/keybindings-tab";
+import { AppearanceTab } from "@/components/settings/appearance-tab";
 
 export default function SettingsPage() {
   return (
@@ -21,6 +22,7 @@ export default function SettingsPage() {
             <TabsTrigger value="providers">Providers</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
             <TabsTrigger value="keybindings">Keybindings</TabsTrigger>
+            <TabsTrigger value="appearance">Appearance</TabsTrigger>
             <TabsTrigger value="about">About</TabsTrigger>
           </TabsList>
           <TabsContent value="skills" className="mt-4">
@@ -37,6 +39,9 @@ export default function SettingsPage() {
           </TabsContent>
           <TabsContent value="keybindings" className="mt-4">
             <KeybindingsTab />
+          </TabsContent>
+          <TabsContent value="appearance" className="mt-4">
+            <AppearanceTab />
           </TabsContent>
           <TabsContent value="about" className="mt-4">
             <AboutTab />

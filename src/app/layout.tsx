@@ -39,7 +39,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=JSON.parse(localStorage.getItem('weave-theme'));var h=document.documentElement;if(t==='black'){h.classList.add('dark','theme-black');}else if(t==='light'){h.classList.remove('dark');h.classList.add('theme-light');}else{h.classList.add('dark');}}catch(e){}})();` }} />
+      </head>
       <body
         className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}
       >
