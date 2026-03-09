@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -84,6 +84,31 @@ export function NewSessionDialog({ trigger, open: controlledOpen, onOpenChange, 
   const [branch, setBranch] = useState("");
   const { createSession, isLoading, error } = useCreateSession();
 
+  /** Roving tabindex: arrow keys move between isolation strategy buttons */
+  const handleStrategyKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      const idx = STRATEGY_ORDER.indexOf(isolationStrategy);
+      let next: number | null = null;
+
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        next = (idx + 1) % STRATEGY_ORDER.length;
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        next = (idx - 1 + STRATEGY_ORDER.length) % STRATEGY_ORDER.length;
+      }
+
+      if (next !== null) {
+        e.preventDefault();
+        const nextStrategy = STRATEGY_ORDER[next];
+        setIsolationStrategy(nextStrategy);
+        // Move focus to the newly-active button
+        const container = e.currentTarget;
+        const buttons = container.querySelectorAll<HTMLButtonElement>("[role=radio]");
+        buttons[next]?.focus();
+      }
+    },
+    [isolationStrategy]
+  );
+
   const setOpen = (value: boolean) => {
     setInternalOpen(value);
     onOpenChange?.(value);
@@ -120,12 +145,17 @@ export function NewSessionDialog({ trigger, open: controlledOpen, onOpenChange, 
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Isolation Strategy */}
+          {/* Isolation Strategy — roving tabindex: single tab stop, arrow keys to switch */}
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">
+            <label className="text-sm font-medium" id="isolation-strategy-label">
               Isolation Strategy
             </label>
-            <div className="flex gap-1">
+            <div
+              className="flex gap-1"
+              role="radiogroup"
+              aria-labelledby="isolation-strategy-label"
+              onKeyDown={handleStrategyKeyDown}
+            >
               {STRATEGY_ORDER.map((s) => {
                 const Icon = STRATEGY_ICONS[s];
                 const isActive = isolationStrategy === s;
@@ -133,6 +163,9 @@ export function NewSessionDialog({ trigger, open: controlledOpen, onOpenChange, 
                   <button
                     key={s}
                     type="button"
+                    role="radio"
+                    aria-checked={isActive}
+                    tabIndex={isActive ? 0 : -1}
                     onClick={() => setIsolationStrategy(s)}
                     disabled={isLoading}
                     className={`flex-1 flex flex-col items-center justify-center rounded-md border px-3 py-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
