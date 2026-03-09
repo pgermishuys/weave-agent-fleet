@@ -82,6 +82,30 @@ export function NewSessionDialog({ trigger, open: controlledOpen, onOpenChange, 
   const [title, setTitle] = useState("");
   const [isolationStrategy, setIsolationStrategy] = useState<IsolationStrategy>("existing");
   const [branch, setBranch] = useState("");
+  const [branchManuallyEdited, setBranchManuallyEdited] = useState(false);
+
+  /** Generate a branch name from the title: lowercase, hyphenated, trimmed */
+  const generateBranchName = (text: string): string => {
+    return text
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, "")  // strip non-alphanumeric (keep spaces and hyphens)
+      .replace(/\s+/g, "-")           // spaces → hyphens
+      .replace(/-+/g, "-")            // collapse multiple hyphens
+      .replace(/^-|-$/g, "");         // trim leading/trailing hyphens
+  };
+
+  const handleTitleChange = (value: string) => {
+    setTitle(value);
+    if (isolationStrategy === "worktree" && !branchManuallyEdited) {
+      setBranch(generateBranchName(value));
+    }
+  };
+
+  const handleBranchChange = (value: string) => {
+    setBranch(value);
+    setBranchManuallyEdited(true);
+  };
   const { createSession, isLoading, error } = useCreateSession();
 
   /** Roving tabindex: arrow keys move between isolation strategy buttons */
@@ -110,6 +134,12 @@ export function NewSessionDialog({ trigger, open: controlledOpen, onOpenChange, 
   );
 
   const setOpen = (value: boolean) => {
+    if (!value) {
+      // Reset fields on dialog close so next open starts fresh
+      setTitle("");
+      setBranch("");
+      setBranchManuallyEdited(false);
+    }
     setInternalOpen(value);
     onOpenChange?.(value);
   };
@@ -125,9 +155,6 @@ export function NewSessionDialog({ trigger, open: controlledOpen, onOpenChange, 
         branch: isolationStrategy === "worktree" && branch.trim() ? branch.trim() : undefined,
       });
       setOpen(false);
-      setTitle("");
-      setIsolationStrategy("existing");
-      setBranch("");
       router.push(
         `/sessions/${encodeURIComponent(session.id)}?instanceId=${encodeURIComponent(instanceId)}`
       );
@@ -199,26 +226,6 @@ export function NewSessionDialog({ trigger, open: controlledOpen, onOpenChange, 
             />
           </div>
 
-          {/* Branch name — only for worktree */}
-          {isolationStrategy === "worktree" && (
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium" htmlFor="branch">
-                Branch{" "}
-                <span className="text-muted-foreground font-normal">(optional)</span>
-              </label>
-              <Input
-                id="branch"
-                value={branch}
-                onChange={(e) => setBranch(e.target.value)}
-                placeholder="feature/my-branch"
-                disabled={isLoading}
-              />
-              <p className="text-xs text-muted-foreground">
-                A unique branch name will be generated if left blank.
-              </p>
-            </div>
-          )}
-
           {/* Title */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium" htmlFor="session-title">
@@ -228,11 +235,33 @@ export function NewSessionDialog({ trigger, open: controlledOpen, onOpenChange, 
             <Input
               id="session-title"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => handleTitleChange(e.target.value)}
               placeholder="What are you working on?"
               disabled={isLoading}
             />
           </div>
+
+          {/* Branch name — only for worktree, auto-generated from title until manually edited */}
+          {isolationStrategy === "worktree" && (
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium" htmlFor="branch">
+                Branch{" "}
+                <span className="text-muted-foreground font-normal">(optional)</span>
+              </label>
+              <Input
+                id="branch"
+                value={branch}
+                onChange={(e) => handleBranchChange(e.target.value)}
+                placeholder="feature/my-branch"
+                disabled={isLoading}
+              />
+              <p className="text-xs text-muted-foreground">
+                {branchManuallyEdited
+                  ? "A unique branch name will be generated if left blank."
+                  : "Auto-generated from title. Edit to override."}
+              </p>
+            </div>
+          )}
 
           {error && (
             <div className="flex items-start gap-2 rounded-md bg-red-500/10 border border-red-500/20 px-3 py-2 text-xs text-red-600 dark:text-red-400">
