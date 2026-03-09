@@ -19,6 +19,10 @@ interface DiffViewerProps {
   diffs: FileDiffItem[];
   isLoading: boolean;
   error?: string;
+  /** Pre-computed total additions — avoids duplicate useMemo when parent already computes this. */
+  totalAdditions?: number;
+  /** Pre-computed total deletions — avoids duplicate useMemo when parent already computes this. */
+  totalDeletions?: number;
 }
 
 const STATUS_BADGE_MAP: Record<
@@ -176,8 +180,12 @@ function FileDiffSection({
   );
 }
 
-export function DiffViewer({ diffs, isLoading, error }: DiffViewerProps) {
+export function DiffViewer({ diffs, isLoading, error, totalAdditions: propAdditions, totalDeletions: propDeletions }: DiffViewerProps) {
   const { totalAdditions, totalDeletions } = useMemo(() => {
+    // Use pre-computed values from parent if available
+    if (propAdditions !== undefined && propDeletions !== undefined) {
+      return { totalAdditions: propAdditions, totalDeletions: propDeletions };
+    }
     let additions = 0;
     let deletions = 0;
     for (const d of diffs) {
@@ -185,7 +193,7 @@ export function DiffViewer({ diffs, isLoading, error }: DiffViewerProps) {
       deletions += d.deletions;
     }
     return { totalAdditions: additions, totalDeletions: deletions };
-  }, [diffs]);
+  }, [diffs, propAdditions, propDeletions]);
 
   if (isLoading) {
     return (

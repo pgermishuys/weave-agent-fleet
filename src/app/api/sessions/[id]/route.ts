@@ -20,6 +20,41 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
+interface AncestorInfo {
+  dbId: string;
+  instanceId: string;
+  opencodeSessionId: string;
+  title: string;
+}
+
+/**
+ * Walk the parent chain from a starting session ID, returning an array of
+ * ancestor entries in root-first order (e.g. [grandparent, parent]).
+ * The walk is bounded to prevent infinite loops from circular references.
+ */
+function walkAncestorChain(
+  startSessionId: string | null | undefined,
+  maxDepth = 10
+): AncestorInfo[] {
+  const chain: AncestorInfo[] = [];
+  let currentId = startSessionId;
+  let depth = 0;
+  while (currentId && depth < maxDepth) {
+    const parent = getSession(currentId);
+    if (!parent) break;
+    chain.push({
+      dbId: parent.id,
+      instanceId: parent.instance_id,
+      opencodeSessionId: parent.opencode_session_id,
+      title: parent.title,
+    });
+    currentId = parent.parent_session_id;
+    depth++;
+  }
+  chain.reverse();
+  return chain;
+}
+
 // PATCH /api/sessions/[id] — rename a session
 export async function PATCH(
   request: NextRequest,
@@ -120,6 +155,7 @@ export async function GET(
     let workspaceId: string | null = null;
     let workspaceDirectory: string | null = null;
     let isolationStrategy: string | null = null;
+    const ancestors: AncestorInfo[] = [];
 
     try {
       const dbSession = getSession(sessionId) ?? getSessionByOpencodeId(sessionId);
@@ -130,9 +166,44 @@ export async function GET(
           workspaceDirectory = ws.directory;
           isolationStrategy = ws.isolation_strategy;
         }
+
+        // Walk parent chain to build ancestors array (root-first)
+        ancestors.push(...walkAncestorChain(dbSession.parent_session_id));
+      } else {
+        // Session exists in OpenCode but not in Fleet DB — this is a subagent
+        // session spawned by the Task tool within OpenCode. Find the parent by
+        // looking up which Fleet DB session lives on the same OpenCode instance.
+        const instanceSessions = getSessionsForInstance(instanceId);
+        // The parent is the Fleet DB session on this instance whose
+        // opencode_session_id differs from the current subagent session.
+        // Typically there's exactly one Fleet-managed session per instance.
+        const directParent = instanceSessions.find(
+          (s) => s.opencode_session_id !== sessionId
+        );
+        if (directParent) {
+          // Include the direct parent itself, then walk its ancestors
+          const parentEntry = {
+            dbId: directParent.id,
+            instanceId: directParent.instance_id,
+            opencodeSessionId: directParent.opencode_session_id,
+            title: directParent.title,
+          };
+          const parentAncestors = walkAncestorChain(directParent.parent_session_id);
+          // parentAncestors is root-first; append direct parent at the end
+          ancestors.push(...parentAncestors, parentEntry);
+
+          // Also populate workspace metadata from the parent
+          const parentWs = getWorkspace(directParent.workspace_id);
+          if (parentWs) {
+            workspaceId = directParent.workspace_id;
+            workspaceDirectory = parentWs.directory;
+            isolationStrategy = parentWs.isolation_strategy;
+          }
+        }
       }
-    } catch {
+    } catch (err) {
       // DB metadata enrichment is best-effort
+      console.error("[GET /api/sessions] DB enrichment failed:", err);
     }
 
     return NextResponse.json(
@@ -142,6 +213,7 @@ export async function GET(
         workspaceId,
         workspaceDirectory,
         isolationStrategy,
+        ancestors,
       },
       { status: 200 }
     );

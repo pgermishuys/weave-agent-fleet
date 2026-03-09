@@ -437,4 +437,36 @@ describe("getSpawnCommand", () => {
     expect(result).not.toBeNull();
     expect(result!.command).toBe("overridden-bin");
   });
+
+  it("PreservesDirectoryWithSpacesAsOneArgInCustomTool", () => {
+    const config: WeaveToolsConfig = {
+      custom: {
+        "space-tool": {
+          label: "Space Tool",
+          category: "editor",
+          command: "my-editor",
+          args: "--open ${dir} --flag",
+          platforms: [platform],
+        },
+      },
+    };
+    const dirWithSpaces = "/Users/john doe/my projects";
+    const result = getSpawnCommand("space-tool", dirWithSpaces, config);
+    expect(result).not.toBeNull();
+    // The directory should remain a single argument, not split on spaces
+    expect(result!.args).toEqual(["--open", resolve(dirWithSpaces), "--flag"]);
+  });
+
+  it("PreservesDirectoryWithSpacesAsOneArgInOverrideArgs", () => {
+    const config: WeaveToolsConfig = {
+      overrides: {
+        vscode: { args: "--new-window ${dir}" },
+      },
+    };
+    const dirWithSpaces = "/Users/john doe/my projects";
+    const result = getSpawnCommand("vscode", dirWithSpaces, config);
+    expect(result).not.toBeNull();
+    // The directory should remain a single argument, not split on spaces
+    expect(result!.args).toEqual(["--new-window", resolve(dirWithSpaces)]);
+  });
 });

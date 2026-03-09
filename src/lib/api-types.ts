@@ -180,7 +180,22 @@ export function getTaskToolInput(
 export function getTaskToolSessionId(part: AccumulatedToolPart): string | null {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const state = part.state as any;
-  return state?.metadata?.sessionId ?? null;
+
+  // 1. Check state.metadata — the SDK's ToolStateCompleted/ToolStateRunning
+  //    may carry a sessionId (or sessionID) set by the tool implementation.
+  const fromMetadata =
+    state?.metadata?.sessionId ?? state?.metadata?.sessionID ?? null;
+  if (fromMetadata) return fromMetadata;
+
+  // 2. Parse the output string — the Task tool returns "task_id: ses_xxx"
+  //    as the first line of its output when the child session completes.
+  const output = state?.output;
+  if (typeof output === "string") {
+    const match = output.match(/task_id:\s*(\S+)/);
+    if (match?.[1]) return match[1];
+  }
+
+  return null;
 }
 
 // File search returns Array<string> (file paths) — no wrapper type needed

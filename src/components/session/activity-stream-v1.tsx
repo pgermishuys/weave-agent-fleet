@@ -1,15 +1,17 @@
 "use client";
 
 import { Fragment, memo, useMemo, useCallback, useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Bot, User, Wrench, Loader2, AlertCircle, RefreshCw, ChevronDown } from "lucide-react";
+import { Bot, User, Wrench, Loader2, AlertCircle, RefreshCw, ChevronDown, ArrowUpRight, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useScrollAnchor } from "@/hooks/use-scroll-anchor";
 import { useActivityFilter } from "@/hooks/use-activity-filter";
 import { useKeyboardShortcut } from "@/hooks/use-keyboard-shortcut";
 import type { AccumulatedMessage, AccumulatedPart, AccumulatedToolPart, AutocompleteAgent } from "@/lib/api-types";
-import { isTaskToolCall, getTaskToolInput } from "@/lib/api-types";
+import { isTaskToolCall, getTaskToolInput, getTaskToolSessionId } from "@/lib/api-types";
+import Link from "next/link";
 import type { SessionConnectionStatus } from "@/hooks/use-session-events";
 import { isTodoWriteTool, parseTodoOutput } from "@/lib/todo-utils";
 import { resolveAgentColor } from "@/lib/agent-colors";
@@ -58,30 +60,75 @@ function TaskDelegationItem({ part }: { part: AccumulatedToolPart }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const state = part.state as any;
   const input = getTaskToolInput(part);
+
+  // The child session runs on the same OpenCode instance as the parent.
+  // We can build the navigation URL directly from the extracted session ID
+  // and the current page's instanceId — no DB lookup required.
+  const searchParams = useSearchParams();
+  const parentInstanceId = searchParams.get("instanceId");
+  const childOpencodeSessionId = getTaskToolSessionId(part);
+
   if (!input) return null;
 
   const isRunning = state?.status === "running" || state?.status === "pending" || !state?.status;
   const isError = state?.status === "error";
+  const isCompleted = !isRunning && !isError;
 
   const title = input.subagent_type
     ? `${toTitleCase(input.subagent_type)} Task`
     : "Subagent Task";
 
-  return (
-    <div className="my-1 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs border-l-2 border-l-indigo-500/60">
+  const childUrl = childOpencodeSessionId && parentInstanceId
+    ? `/sessions/${encodeURIComponent(childOpencodeSessionId)}?instanceId=${encodeURIComponent(parentInstanceId)}`
+    : null;
+
+  // Status summary from part.state (no API calls needed)
+  const outputPreview = (() => {
+    if (!state?.output) return null;
+    const firstLine = String(state.output).split("\n")[0];
+    return firstLine.length > 80 ? firstLine.slice(0, 80) + "…" : firstLine;
+  })();
+
+  const cardContent = (
+    <>
       <div className="flex items-center gap-2 font-medium text-foreground/80">
         {isRunning && <Loader2 className="h-3 w-3 animate-spin text-indigo-400 shrink-0" />}
-        {!isRunning && !isError && (
-          <span className="h-2 w-2 rounded-full bg-green-500 shrink-0 inline-block" />
+        {isCompleted && (
+          <CheckCircle2 className="h-3 w-3 text-green-500 shrink-0" />
         )}
         {isError && (
-          <span className="h-2 w-2 rounded-full bg-red-500 shrink-0 inline-block" />
+          <AlertTriangle className="h-3 w-3 text-red-500 shrink-0" />
         )}
-        <span>{title}</span>
+        <span className="flex-1">{title}</span>
+        {childUrl && (
+          <ArrowUpRight className="h-3 w-3 shrink-0 text-muted-foreground/60" />
+        )}
       </div>
       {input.description && (
         <p className="mt-1 text-muted-foreground leading-relaxed">{input.description}</p>
       )}
+      {outputPreview && !isRunning && (
+        <p className={`mt-1 leading-relaxed truncate ${isError ? "text-red-500/80" : "text-muted-foreground/70"}`}>
+          {outputPreview}
+        </p>
+      )}
+    </>
+  );
+
+  if (childUrl) {
+    return (
+      <Link
+        href={childUrl}
+        className="my-1 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs border-l-2 border-l-indigo-500/60 block hover:bg-muted/50 hover:border-border transition-colors"
+      >
+        {cardContent}
+      </Link>
+    );
+  }
+
+  return (
+    <div className="my-1 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs border-l-2 border-l-indigo-500/60">
+      {cardContent}
     </div>
   );
 }

@@ -678,6 +678,22 @@ export function resolveTools(
 }
 
 /**
+ * Split an args template string into an array, preserving `${dir}` as a
+ * single token even when the directory path contains spaces.
+ *
+ * The template is first split on whitespace, then each token has `${dir}`
+ * replaced with the actual directory path.  Because the split happens
+ * *before* substitution, spaces inside the directory value never cause
+ * an argument to be broken apart.
+ */
+function expandArgsTemplate(template: string, directory: string): string[] {
+  return template
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((token) => token.replace(/\$\{dir\}/g, directory));
+}
+
+/**
  * Build the spawn command for a given tool + directory, accounting for
  * config overrides and custom tool definitions.
  */
@@ -708,7 +724,7 @@ export function getSpawnCommand(
 
     const command = override?.command ?? platformCmd.command;
     const args = override?.args
-      ? override.args.replace(/\$\{dir\}/g, safeDirectory).split(/\s+/).filter(Boolean)
+      ? expandArgsTemplate(override.args, safeDirectory)
       : platformCmd.args(safeDirectory);
 
     const options: {
@@ -735,10 +751,7 @@ export function getSpawnCommand(
 
     const command = override?.command ?? customDef.command;
     const argsTemplate = override?.args ?? customDef.args ?? "${dir}";
-    const args = argsTemplate
-      .replace(/\$\{dir\}/g, safeDirectory)
-      .split(/\s+/)
-      .filter(Boolean);
+    const args = expandArgsTemplate(argsTemplate, safeDirectory);
 
     return {
       command,

@@ -9,13 +9,13 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useSessionEvents } from "@/hooks/use-session-events";
 import { useSendPrompt } from "@/hooks/use-send-prompt";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAgents } from "@/hooks/use-agents";
 import { useDiffs } from "@/hooks/use-diffs";
 import { apiFetch } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { FolderOpen, GitBranch, GitCompare, Server, Clock, Hash, Square, RotateCcw, Trash2, MessageSquare, OctagonX, AlertTriangle, RefreshCw } from "lucide-react";
+import { FolderOpen, GitBranch, GitCompare, Server, Clock, Hash, Square, RotateCcw, Trash2, MessageSquare, OctagonX, AlertTriangle, RefreshCw, ArrowLeft, ChevronRight } from "lucide-react";
 import { useTerminateSession } from "@/hooks/use-terminate-session";
 import { useAbortSession } from "@/hooks/use-abort-session";
 import { useResumeSession } from "@/hooks/use-resume-session";
@@ -26,12 +26,21 @@ import { TodoSidebarPanel } from "@/components/session/todo-sidebar-panel";
 import { DiffViewer } from "@/components/session/diff-viewer";
 import { useCommandRegistry } from "@/contexts/command-registry-context";
 import { useKeybindings } from "@/contexts/keybindings-context";
+import Link from "next/link";
+
+interface AncestorInfo {
+  dbId: string;
+  instanceId: string;
+  opencodeSessionId: string;
+  title: string;
+}
 
 interface SessionMetadata {
   workspaceId: string | null;
   workspaceDirectory: string | null;
   isolationStrategy: string | null;
   createdAt?: number;
+  ancestors?: AncestorInfo[];
 }
 
 export default function SessionDetailPage() {
@@ -111,9 +120,14 @@ export default function SessionDetailPage() {
     workspaceDirectory: null,
     isolationStrategy: null,
   });
+  // Track whether metadata has been fetched at least once (distinguishes
+  // "not yet loaded" from "loaded but empty ancestors").
+  const metadataFetchedRef = useRef(false);
 
-  // Fetch session metadata on mount
-  useEffect(() => {
+  // Stable callback to fetch session metadata from the API.
+  // Used on initial mount and retried when SSE connects but metadata is missing
+  // (e.g. subagent session wasn't ready on the first attempt).
+  const fetchMetadata = useCallback(() => {
     if (!sessionId || !instanceId) return;
     const url = `/api/sessions/${encodeURIComponent(sessionId)}?instanceId=${encodeURIComponent(instanceId)}`;
     apiFetch(url)
@@ -125,13 +139,15 @@ export default function SessionDetailPage() {
         }
         return r.json();
       })
-      .then((data: { workspaceId?: string; workspaceDirectory?: string; isolationStrategy?: string; session?: { time?: { created?: number } } } | null) => {
+      .then((data: { workspaceId?: string; workspaceDirectory?: string; isolationStrategy?: string; session?: { time?: { created?: number } }; ancestors?: AncestorInfo[] } | null) => {
         if (!data) return;
+        metadataFetchedRef.current = true;
         setMetadata({
           workspaceId: data.workspaceId ?? null,
           workspaceDirectory: data.workspaceDirectory ?? null,
           isolationStrategy: data.isolationStrategy ?? null,
           createdAt: data.session?.time?.created,
+          ancestors: data.ancestors,
         });
       })
       .catch(() => {
@@ -139,17 +155,41 @@ export default function SessionDetailPage() {
       });
   }, [sessionId, instanceId]);
 
+  // Reset metadata state when sessionId changes (e.g. client-side navigation
+  // from a parent session to a child session).  Without this, the stale
+  // metadataFetchedRef from the previous session prevents the retry logic and
+  // stale ancestors from the parent session linger.
+  useEffect(() => {
+    metadataFetchedRef.current = false;
+    setMetadata({
+      workspaceId: null,
+      workspaceDirectory: null,
+      isolationStrategy: null,
+    });
+  }, [sessionId]);
+
+  // Fetch session metadata on mount and whenever sessionId changes
+  useEffect(() => {
+    fetchMetadata();
+  }, [fetchMetadata]);
+
   // Safety net: if SSE connects successfully, the instance is alive.
   // Clear any false isResumable flag from a transient metadata fetch failure
   // (e.g. caused by module re-evaluation during dev HMR).
+  // Also retry metadata fetch if it hasn't succeeded yet — this handles
+  // subagent sessions where the initial fetch may have raced against
+  // session creation.
   useEffect(() => {
     if (status === "connected" && isResumable && !isStopped) {
       setIsResumable(false);
     }
+    if (status === "connected" && !metadataFetchedRef.current) {
+      fetchMetadata();
+    }
     if (status === "abandoned" && !isResumable && !isStopped) {
       setIsResumable(true);
     }
-  }, [status, isResumable, isStopped]);
+  }, [status, isResumable, isStopped, fetchMetadata]);
 
   // Compute aggregate tokens from accumulated messages
   const totalTokens = messages.reduce(
@@ -375,6 +415,35 @@ export default function SessionDetailPage() {
               </Button>
             </div>
           )}
+          {metadata.ancestors && metadata.ancestors.length > 0 && (
+            <div className="flex items-center gap-1.5 px-4 py-1.5 text-xs text-muted-foreground border-b border-border/40 overflow-x-auto">
+              <Link
+                href={(() => {
+                  const parent = metadata.ancestors!.at(-1);
+                  return parent
+                    ? `/sessions/${encodeURIComponent(parent.opencodeSessionId)}?instanceId=${encodeURIComponent(parent.instanceId)}`
+                    : "/";
+                })()}
+                className="shrink-0 hover:text-foreground transition-colors"
+              >
+                <ArrowLeft className="h-3 w-3" />
+              </Link>
+              {metadata.ancestors.map((ancestor, i) => (
+                <Fragment key={ancestor.dbId}>
+                  {i > 0 && <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground/50" />}
+                  <Link
+                    href={`/sessions/${encodeURIComponent(ancestor.opencodeSessionId)}?instanceId=${encodeURIComponent(ancestor.instanceId)}`}
+                    className="shrink-0 hover:text-foreground transition-colors truncate max-w-[200px]"
+                    title={ancestor.title}
+                  >
+                    {ancestor.title}
+                  </Link>
+                </Fragment>
+              ))}
+              <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground/50" />
+              <span className="shrink-0 text-foreground font-medium truncate max-w-[200px]">Current</span>
+            </div>
+          )}
           <Tabs
             defaultValue="activity"
             className="flex flex-1 flex-col overflow-hidden"
@@ -420,7 +489,7 @@ export default function SessionDetailPage() {
               />
             </TabsContent>
             <TabsContent value="changes" className="flex-1 overflow-hidden">
-              <DiffViewer diffs={diffs} isLoading={diffsLoading} error={diffsError} />
+              <DiffViewer diffs={diffs} isLoading={diffsLoading} error={diffsError} totalAdditions={totalDiffAdditions} totalDeletions={totalDiffDeletions} />
             </TabsContent>
           </Tabs>
         </div>
