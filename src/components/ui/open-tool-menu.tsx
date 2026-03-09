@@ -1,7 +1,13 @@
 "use client";
 
-import { Code2, MousePointer2, Terminal, FolderOpen } from "lucide-react";
+import { ExternalLink, Loader2 } from "lucide-react";
 import type { OpenTool } from "@/hooks/use-open-directory";
+import {
+  useAvailableTools,
+  getToolsByCategory,
+  type AvailableTool,
+} from "@/hooks/use-available-tools";
+import { getToolIcon } from "@/lib/tool-icons";
 
 import {
   DropdownMenuSub,
@@ -19,23 +25,24 @@ import {
   ContextMenuSeparator,
 } from "@/components/ui/context-menu";
 
-import { ExternalLink } from "lucide-react";
+// ── Shared data preparation ─────────────────────────────────────────────────
 
-interface OpenToolItem {
-  tool: OpenTool;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
+interface ToolGroup {
+  category: AvailableTool["category"];
+  tools: AvailableTool[];
 }
 
-const TOOL_ITEMS: OpenToolItem[] = [
-  { tool: "vscode", label: "VS Code", icon: Code2 },
-  { tool: "cursor", label: "Cursor", icon: MousePointer2 },
-];
-
-const SECONDARY_TOOL_ITEMS: OpenToolItem[] = [
-  { tool: "terminal", label: "Terminal", icon: Terminal },
-  { tool: "explorer", label: "File Explorer", icon: FolderOpen },
-];
+function groupTools(tools: AvailableTool[]): ToolGroup[] {
+  const order: AvailableTool["category"][] = ["editor", "terminal", "explorer"];
+  const groups: ToolGroup[] = [];
+  for (const category of order) {
+    const items = getToolsByCategory(tools, category);
+    if (items.length > 0) {
+      groups.push({ category, tools: items });
+    }
+  }
+  return groups;
+}
 
 // ── Dropdown Menu variant (for SessionGroup overflow menu) ──────────────────
 
@@ -48,6 +55,9 @@ export function OpenToolDropdownSubmenu({
   directory,
   onOpen,
 }: OpenToolDropdownSubmenuProps) {
+  const { tools, isLoading } = useAvailableTools();
+  const groups = groupTools(tools);
+
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger className="gap-2 text-xs">
@@ -55,33 +65,41 @@ export function OpenToolDropdownSubmenu({
         Open in...
       </DropdownMenuSubTrigger>
       <DropdownMenuSubContent>
-        {TOOL_ITEMS.map(({ tool, label, icon: Icon }) => (
-          <DropdownMenuItem
-            key={tool}
-            onClick={() => onOpen(directory, tool)}
-            className="gap-2 text-xs"
-          >
-            <Icon className="size-3.5" />
-            {label}
+        {isLoading && tools.length === 0 && (
+          <DropdownMenuItem disabled className="gap-2 text-xs">
+            <Loader2 className="size-3.5 animate-spin" />
+            Detecting tools…
           </DropdownMenuItem>
-        ))}
-        <DropdownMenuSeparator />
-        {SECONDARY_TOOL_ITEMS.map(({ tool, label, icon: Icon }) => (
-          <DropdownMenuItem
-            key={tool}
-            onClick={() => onOpen(directory, tool)}
-            className="gap-2 text-xs"
-          >
-            <Icon className="size-3.5" />
-            {label}
+        )}
+        {!isLoading && tools.length === 0 && (
+          <DropdownMenuItem disabled className="gap-2 text-xs text-muted-foreground">
+            No tools detected
           </DropdownMenuItem>
+        )}
+        {groups.map((group, gi) => (
+          <div key={group.category}>
+            {gi > 0 && <DropdownMenuSeparator />}
+            {group.tools.map((tool) => {
+              const Icon = getToolIcon(tool.iconName);
+              return (
+                <DropdownMenuItem
+                  key={tool.id}
+                  onClick={() => onOpen(directory, tool.id)}
+                  className="gap-2 text-xs"
+                >
+                  <Icon className="size-3.5" />
+                  <span className="flex-1">{tool.label}</span>
+                </DropdownMenuItem>
+              );
+            })}
+          </div>
         ))}
       </DropdownMenuSubContent>
     </DropdownMenuSub>
   );
 }
 
-// ── Context Menu variant (for SidebarWorkspaceItem right-click menu) ────────
+// ── Context Menu variant (for right-click menus) ────────────────────────────
 
 interface OpenToolContextSubmenuProps {
   directory: string;
@@ -92,6 +110,9 @@ export function OpenToolContextSubmenu({
   directory,
   onOpen,
 }: OpenToolContextSubmenuProps) {
+  const { tools, isLoading } = useAvailableTools();
+  const groups = groupTools(tools);
+
   return (
     <ContextMenuSub>
       <ContextMenuSubTrigger className="gap-2 text-xs">
@@ -99,26 +120,34 @@ export function OpenToolContextSubmenu({
         Open in...
       </ContextMenuSubTrigger>
       <ContextMenuSubContent>
-        {TOOL_ITEMS.map(({ tool, label, icon: Icon }) => (
-          <ContextMenuItem
-            key={tool}
-            onClick={() => onOpen(directory, tool)}
-            className="gap-2 text-xs"
-          >
-            <Icon className="h-3.5 w-3.5" />
-            {label}
+        {isLoading && tools.length === 0 && (
+          <ContextMenuItem disabled className="gap-2 text-xs">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Detecting tools…
           </ContextMenuItem>
-        ))}
-        <ContextMenuSeparator />
-        {SECONDARY_TOOL_ITEMS.map(({ tool, label, icon: Icon }) => (
-          <ContextMenuItem
-            key={tool}
-            onClick={() => onOpen(directory, tool)}
-            className="gap-2 text-xs"
-          >
-            <Icon className="h-3.5 w-3.5" />
-            {label}
+        )}
+        {!isLoading && tools.length === 0 && (
+          <ContextMenuItem disabled className="gap-2 text-xs text-muted-foreground">
+            No tools detected
           </ContextMenuItem>
+        )}
+        {groups.map((group, gi) => (
+          <div key={group.category}>
+            {gi > 0 && <ContextMenuSeparator />}
+            {group.tools.map((tool) => {
+              const Icon = getToolIcon(tool.iconName);
+              return (
+                <ContextMenuItem
+                  key={tool.id}
+                  onClick={() => onOpen(directory, tool.id)}
+                  className="gap-2 text-xs"
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  <span className="flex-1">{tool.label}</span>
+                </ContextMenuItem>
+              );
+            })}
+          </div>
         ))}
       </ContextMenuSubContent>
     </ContextMenuSub>

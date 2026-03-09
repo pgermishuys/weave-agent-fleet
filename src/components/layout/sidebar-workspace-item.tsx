@@ -24,7 +24,7 @@ import { NewSessionDialog } from "@/components/session/new-session-dialog";
 import { useRenameWorkspace } from "@/hooks/use-rename-workspace";
 import { useTerminateSession } from "@/hooks/use-terminate-session";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { useOpenDirectory, usePreferredOpenTool } from "@/hooks/use-open-directory";
+import { useOpenDirectory } from "@/hooks/use-open-directory";
 import type { OpenTool } from "@/hooks/use-open-directory";
 import { OpenToolContextSubmenu } from "@/components/ui/open-tool-menu";
 import type { WorkspaceGroup } from "@/hooks/use-workspaces";
@@ -52,7 +52,6 @@ export const SidebarWorkspaceItem = React.memo(function SidebarWorkspaceItem({
   const { renameWorkspace } = useRenameWorkspace();
   const { terminateSession } = useTerminateSession();
   const { openDirectory } = useOpenDirectory();
-  const [, setPreferredTool] = usePreferredOpenTool();
 
   const [isRenaming, setIsRenaming] = useState(false);
   const [newSessionOpen, setNewSessionOpen] = useState(false);
@@ -94,10 +93,9 @@ export const SidebarWorkspaceItem = React.memo(function SidebarWorkspaceItem({
 
   const handleOpen = useCallback(
     (directory: string, tool: OpenTool) => {
-      setPreferredTool(tool);
       openDirectory(directory, tool);
     },
-    [openDirectory, setPreferredTool]
+    [openDirectory]
   );
 
   return (

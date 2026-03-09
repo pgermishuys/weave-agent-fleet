@@ -6,7 +6,16 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
-import { ArrowRight, Clock, Copy, ExternalLink, GitBranch, Loader2, OctagonX, RotateCcw, Square, Trash2, WifiOff } from "lucide-react";
+import { ArrowRight, Clock, Copy, GitBranch, Loader2, OctagonX, RotateCcw, Square, Trash2, WifiOff } from "lucide-react";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuTrigger,
+  ContextMenuSeparator,
+  ContextMenuItem,
+} from "@/components/ui/context-menu";
+import { OpenToolContextSubmenu } from "@/components/ui/open-tool-menu";
+import type { OpenTool } from "@/hooks/use-open-directory";
 import type { SessionListItem } from "@/lib/api-types";
 import { formatRelativeTime } from "@/lib/format-utils";
 
@@ -25,7 +34,7 @@ export const LiveSessionCard = React.memo(function LiveSessionCard({
   onTerminate: (sessionId: string, instanceId: string) => void;
   onResume?: (sessionId: string) => void;
   onDelete?: (sessionId: string, instanceId: string) => void;
-  onOpen?: (directory: string) => void;
+  onOpen?: (directory: string, tool: OpenTool) => void;
   onAbort?: (sessionId: string, instanceId: string) => void;
   isResuming?: boolean;
   isParent?: boolean;
@@ -61,7 +70,7 @@ export const LiveSessionCard = React.memo(function LiveSessionCard({
   const canDelete = (isStopped || isCompleted || isDisconnected) && !!onDelete;
   const canAbort = activityStatus === "busy" && !!onAbort;
 
-  return (
+  const cardContent = (
     <div className={`relative group ${isInactive ? "opacity-60" : ""}`}>
       <Link href={`/sessions/${encodeURIComponent(session.id)}?instanceId=${encodeURIComponent(instanceId)}`}>
         <Card className="transition-all hover:border-foreground/20 hover:shadow-md cursor-pointer">
@@ -197,23 +206,31 @@ export const LiveSessionCard = React.memo(function LiveSessionCard({
           )}
         </Button>
       )}
-      {onOpen && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className={`absolute top-2 ${
-            isInactive && onResume ? "right-[4.5rem]" : canAbort ? "right-[4.5rem]" : "right-10"
-          } h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10`}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onOpen(item.workspaceDirectory);
-          }}
-          title="Open in editor"
-        >
-          <ExternalLink className="h-3.5 w-3.5" />
-        </Button>
-      )}
     </div>
+  );
+
+  if (!onOpen) {
+    return cardContent;
+  }
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>{cardContent}</ContextMenuTrigger>
+      <ContextMenuContent>
+        <OpenToolContextSubmenu
+          directory={item.workspaceDirectory}
+          onOpen={onOpen}
+        />
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          className="gap-2 text-xs"
+          onClick={() => {
+            void navigator.clipboard.writeText(item.workspaceDirectory);
+          }}
+        >
+          Copy path
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 });

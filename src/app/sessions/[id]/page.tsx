@@ -15,12 +15,11 @@ import { useDiffs } from "@/hooks/use-diffs";
 import { apiFetch } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { FolderOpen, GitBranch, GitCompare, Server, Clock, Hash, Square, RotateCcw, Trash2, ExternalLink, MessageSquare, OctagonX, AlertTriangle, RefreshCw } from "lucide-react";
+import { FolderOpen, GitBranch, GitCompare, Server, Clock, Hash, Square, RotateCcw, Trash2, MessageSquare, OctagonX, AlertTriangle, RefreshCw } from "lucide-react";
 import { useTerminateSession } from "@/hooks/use-terminate-session";
 import { useAbortSession } from "@/hooks/use-abort-session";
 import { useResumeSession } from "@/hooks/use-resume-session";
 import { useDeleteSession } from "@/hooks/use-delete-session";
-import { useOpenDirectory, usePreferredOpenTool } from "@/hooks/use-open-directory";
 import { ConfirmDeleteSessionDialog } from "@/components/fleet/confirm-delete-session-dialog";
 import { extractLatestTodos } from "@/lib/todo-utils";
 import { TodoSidebarPanel } from "@/components/session/todo-sidebar-panel";
@@ -55,8 +54,6 @@ export default function SessionDetailPage() {
   const { abortSession, isAborting } = useAbortSession();
   const { resumeSession, isResuming } = useResumeSession();
   const { deleteSession: permanentDelete, isDeleting } = useDeleteSession();
-  const { openDirectory } = useOpenDirectory();
-  const [preferredTool] = usePreferredOpenTool();
   const router = useRouter();
   const { diffs, isLoading: diffsLoading, error: diffsError, fetchDiffs } = useDiffs(sessionId, instanceId);
   const [isStopped, setIsStopped] = useState(false);
@@ -459,15 +456,6 @@ export default function SessionDetailPage() {
                   <div className="flex items-center gap-1.5">
                     <FolderOpen className="h-3 w-3 text-muted-foreground" />
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Workspace</p>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5 ml-auto text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10"
-                      onClick={() => openDirectory(metadata.workspaceDirectory!, preferredTool)}
-                      title={`Open in ${preferredTool}`}
-                    >
-                      <ExternalLink className="h-3 w-3" />
-                    </Button>
                   </div>
                   <p className="text-xs font-mono break-all">{metadata.workspaceDirectory}</p>
                 </div>

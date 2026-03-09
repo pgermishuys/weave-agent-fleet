@@ -14,11 +14,14 @@ import {
 } from "@/components/ui/context-menu";
 import { InlineEdit } from "@/components/ui/inline-edit";
 import { ConfirmDeleteSessionDialog } from "@/components/fleet/confirm-delete-session-dialog";
+import { OpenToolContextSubmenu } from "@/components/ui/open-tool-menu";
 import { useRenameSession } from "@/hooks/use-rename-session";
 import { useTerminateSession } from "@/hooks/use-terminate-session";
 import { useAbortSession } from "@/hooks/use-abort-session";
 import { useDeleteSession } from "@/hooks/use-delete-session";
 import { useResumeSession } from "@/hooks/use-resume-session";
+import { useOpenDirectory } from "@/hooks/use-open-directory";
+import type { OpenTool } from "@/hooks/use-open-directory";
 import type { SessionListItem } from "@/lib/api-types";
 
 interface SidebarSessionItemProps {
@@ -36,6 +39,7 @@ export const SidebarSessionItem = React.memo(function SidebarSessionItem({ item,
   const { abortSession } = useAbortSession();
   const { deleteSession, isDeleting } = useDeleteSession();
   const { resumeSession } = useResumeSession();
+  const { openDirectory } = useOpenDirectory();
   const [isRenaming, setIsRenaming] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -124,6 +128,13 @@ export const SidebarSessionItem = React.memo(function SidebarSessionItem({ item,
     navigator.clipboard.writeText(session.id).catch(() => {});
   }, [session.id]);
 
+  const handleOpen = useCallback(
+    (directory: string, tool: OpenTool) => {
+      openDirectory(directory, tool);
+    },
+    [openDirectory]
+  );
+
   return (
     <>
       <ContextMenu>
@@ -203,6 +214,14 @@ export const SidebarSessionItem = React.memo(function SidebarSessionItem({ item,
             <Copy className="h-3.5 w-3.5" />
             Copy Session ID
           </ContextMenuItem>
+
+          <ContextMenuSeparator />
+
+          {/* Open in tool */}
+          <OpenToolContextSubmenu
+            directory={item.workspaceDirectory}
+            onOpen={handleOpen}
+          />
 
           <ContextMenuSeparator />
 

@@ -13,8 +13,9 @@ import { useTerminateSession } from "@/hooks/use-terminate-session";
 import { useAbortSession } from "@/hooks/use-abort-session";
 import { useResumeSession } from "@/hooks/use-resume-session";
 import { useDeleteSession } from "@/hooks/use-delete-session";
-import { useOpenDirectory, usePreferredOpenTool } from "@/hooks/use-open-directory";
+import { useOpenDirectory } from "@/hooks/use-open-directory";
 import type { OpenTool } from "@/hooks/use-open-directory";
+
 import { useWorkspaces } from "@/hooks/use-workspaces";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { filterSessionsByWorkspace } from "@/lib/workspace-utils";
@@ -31,7 +32,6 @@ function FleetPageInner() {
   const { resumeSession, resumingSessionId } = useResumeSession();
   const { deleteSession, isDeleting } = useDeleteSession();
   const { openDirectory } = useOpenDirectory();
-  const [preferredTool, setPreferredTool] = usePreferredOpenTool();
   const router = useRouter();
   const searchParams = useSearchParams();
   const workspaceFilter = searchParams.get("workspace");
@@ -108,11 +108,9 @@ function FleetPageInner() {
     }
   }, [deleteTarget, deleteSession, refetch]);
 
-  const handleOpen = useCallback((directory: string, tool?: OpenTool) => {
-    const t = tool ?? preferredTool;
-    if (tool) setPreferredTool(t);
-    openDirectory(directory, t);
-  }, [preferredTool, setPreferredTool, openDirectory]);
+  const handleOpen = useCallback((directory: string, tool: OpenTool) => {
+    openDirectory(directory, tool);
+  }, [openDirectory]);
 
   // Apply workspace URL filter — resolves workspaceId to directory so that all
   // sessions sharing the same workspace directory are included.

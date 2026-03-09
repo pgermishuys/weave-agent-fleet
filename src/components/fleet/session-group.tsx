@@ -83,11 +83,6 @@ export const SessionGroup = React.memo(function SessionGroup({ group, onTerminat
     refetch();
   }, [group.sessions, terminateSession, refetch]);
 
-  const handleOpenVscode = useCallback(
-    (dir: string) => onOpen?.(dir, "vscode"),
-    [onOpen]
-  );
-
   const hasRunning = group.hasRunningSession;
 
   return (
@@ -190,7 +185,7 @@ export const SessionGroup = React.memo(function SessionGroup({ group, onTerminat
                   onResume={onResume}
                   onDelete={onDelete}
                   onAbort={onAbort}
-                  onOpen={onOpen ? handleOpenVscode : undefined}
+                  onOpen={onOpen}
                   isResuming={resumingSessionId === item.session.id}
                 />
                 {children.length > 0 && (
@@ -204,7 +199,7 @@ export const SessionGroup = React.memo(function SessionGroup({ group, onTerminat
                         onResume={onResume}
                         onDelete={onDelete}
                         onAbort={onAbort}
-                        onOpen={onOpen ? handleOpenVscode : undefined}
+                        onOpen={onOpen}
                         isResuming={resumingSessionId === child.session.id}
                       />
                     ))}

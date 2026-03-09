@@ -1,10 +1,16 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { usePersistedState } from "./use-persisted-state";
 import { apiFetch } from "@/lib/api-client";
 
-export type OpenTool = "vscode" | "cursor" | "terminal" | "explorer";
+/**
+ * Tool identifier string.
+ *
+ * Previously a strict union (`"vscode" | "cursor" | "terminal" | "explorer"`),
+ * now widened to `string` because tool IDs are dynamic — they come from the
+ * server-side registry and user config. Validation happens server-side.
+ */
+export type OpenTool = string;
 
 export interface UseOpenDirectoryResult {
   openDirectory: (directory: string, tool: OpenTool) => Promise<void>;
@@ -47,8 +53,4 @@ export function useOpenDirectory(): UseOpenDirectoryResult {
   );
 
   return { openDirectory, isOpening, error };
-}
-
-export function usePreferredOpenTool(): [OpenTool, (tool: OpenTool) => void] {
-  return usePersistedState<OpenTool>("weave:prefs:open-tool", "vscode");
 }

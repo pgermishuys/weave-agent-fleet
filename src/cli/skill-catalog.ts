@@ -19,8 +19,37 @@ export interface WeaveAgentConfig {
   model?: string;
 }
 
+export interface WeaveToolOverride {
+  /** Override the command binary. */
+  command?: string;
+  /** Override args pattern — use ${dir} placeholder for the directory. */
+  args?: string;
+  /** Hide this tool from the menu. */
+  hidden?: boolean;
+}
+
+export interface WeaveCustomTool {
+  label: string;
+  category: "editor" | "terminal" | "explorer";
+  /** Lucide icon name, defaults to "wrench". */
+  iconName?: string;
+  command: string;
+  /** Args pattern — use ${dir} for directory, defaults to "${dir}". */
+  args?: string;
+  /** Restrict to platforms. Omit = all. */
+  platforms?: ("win32" | "darwin" | "linux")[];
+}
+
+export interface WeaveToolsConfig {
+  /** Override builtin tool settings (keyed by builtin tool ID). */
+  overrides?: Record<string, WeaveToolOverride>;
+  /** Add custom tool definitions (keyed by custom tool ID). */
+  custom?: Record<string, WeaveCustomTool>;
+}
+
 export interface WeaveConfig {
   agents?: Record<string, WeaveAgentConfig>;
+  tools?: WeaveToolsConfig;
 }
 
 /**

@@ -15,6 +15,7 @@ import {
   listInstalledSkills as listSkills,
   readWeaveConfig,
   type WeaveConfig,
+  type WeaveToolsConfig,
   type InstalledSkill,
 } from "@/cli/skill-catalog";
 import {
@@ -58,6 +59,16 @@ function deepMerge(base: WeaveConfig, override: WeaveConfig): WeaveConfig {
         merged.agents[agent] = { ...agentConfig };
       }
     }
+  }
+
+  // Merge tools section — project overrides beat user overrides per key
+  if (override.tools || base.tools) {
+    const baseTools = base.tools ?? {};
+    const overrideTools = override.tools ?? {};
+    merged.tools = {
+      overrides: { ...baseTools.overrides, ...overrideTools.overrides },
+      custom: { ...baseTools.custom, ...overrideTools.custom },
+    };
   }
 
   return merged;
@@ -163,4 +174,12 @@ export function getConfigPaths(): {
     userConfig: getUserWeaveConfigPath(),
     skillsDir: getSkillsDir(),
   };
+}
+
+/**
+ * Get the merged tools config (user + project, or user-only when no directory).
+ */
+export function getMergedToolsConfig(directory?: string): WeaveToolsConfig {
+  const config = directory ? getMergedConfig(directory) : (getUserConfig() ?? {});
+  return config.tools ?? {};
 }
