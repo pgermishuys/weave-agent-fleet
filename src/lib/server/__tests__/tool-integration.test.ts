@@ -4,7 +4,7 @@
  */
 
 import { rmSync } from "fs";
-import { join } from "path";
+import { join, resolve } from "path";
 import {
   getToolById,
   isValidToolId,
@@ -141,7 +141,7 @@ describe("config integration", () => {
     const spawn = getSpawnCommand("my-editor", "/projects/foo", config);
     expect(spawn).not.toBeNull();
     expect(spawn!.command).toBe("my-editor-bin");
-    expect(spawn!.args).toEqual(["--open", "/projects/foo"]);
+    expect(spawn!.args).toEqual(["--open", resolve("/projects/foo")]);
   });
 
   it("OverrideCommandAppliesToBuiltinToolSpawn", () => {
