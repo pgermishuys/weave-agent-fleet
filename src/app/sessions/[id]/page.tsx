@@ -15,17 +15,20 @@ import { useDiffs } from "@/hooks/use-diffs";
 import { apiFetch } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { FolderOpen, GitBranch, GitCompare, Server, Clock, Hash, Square, RotateCcw, Trash2, MessageSquare, OctagonX, AlertTriangle, RefreshCw } from "lucide-react";
+import { FolderOpen, GitBranch, GitCompare, Server, Clock, Hash, Square, RotateCcw, Trash2, MessageSquare, OctagonX, AlertTriangle, RefreshCw, Plus } from "lucide-react";
 import { useTerminateSession } from "@/hooks/use-terminate-session";
 import { useAbortSession } from "@/hooks/use-abort-session";
 import { useResumeSession } from "@/hooks/use-resume-session";
 import { useDeleteSession } from "@/hooks/use-delete-session";
 import { ConfirmDeleteSessionDialog } from "@/components/fleet/confirm-delete-session-dialog";
+import { ConfirmNewSessionDialog } from "@/components/fleet/confirm-new-session-dialog";
 import { extractLatestTodos } from "@/lib/todo-utils";
 import { TodoSidebarPanel } from "@/components/session/todo-sidebar-panel";
 import { DiffViewer } from "@/components/session/diff-viewer";
 import { useCommandRegistry } from "@/contexts/command-registry-context";
 import { useKeybindings } from "@/contexts/keybindings-context";
+import { useNewSession } from "@/hooks/use-new-session";
+import { useCurrentSessionDirectory } from "@/hooks/use-current-session-directory";
 
 interface SessionMetadata {
   workspaceId: string | null;
@@ -41,7 +44,18 @@ export default function SessionDetailPage() {
   const sessionId = params.id as string;
   const instanceId = searchParams.get("instanceId") ?? "";
 
-  const { sendPrompt, isSending, error: sendError } = useSendPrompt();
+  // New session — must be declared before useSendPrompt (React hooks ordering)
+  const currentDirectory = useCurrentSessionDirectory();
+  const { startNewSession, isCreating: isCreatingNew } = useNewSession(currentDirectory);
+  const [showNewSessionConfirm, setShowNewSessionConfirm] = useState(false);
+
+  const handleFleetCommand = useCallback(async (command: string, _args: string) => {
+    if (command === "new") {
+      await startNewSession();
+    }
+  }, [startNewSession]);
+
+  const { sendPrompt, isSending, error: sendError } = useSendPrompt(handleFleetCommand);
   const { agents } = useAgents(instanceId);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
 
@@ -271,6 +285,16 @@ export default function SessionDetailPage() {
         subtitle={instanceId ? `Instance: ${instanceId.slice(0, 8)}…` : undefined}
         actions={
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs gap-1"
+              onClick={() => setShowNewSessionConfirm(true)}
+              disabled={isCreatingNew}
+            >
+              <Plus className="h-3 w-3" />
+              New
+            </Button>
             <span
               className={`h-2 w-2 rounded-full ${
                 sessionStatus === "busy"
@@ -605,6 +629,15 @@ export default function SessionDetailPage() {
         sessionTitle={sessionId.slice(0, 12)}
         onConfirm={handlePermanentDelete}
         isDeleting={isDeleting}
+      />
+      <ConfirmNewSessionDialog
+        open={showNewSessionConfirm}
+        onOpenChange={setShowNewSessionConfirm}
+        onConfirm={async () => {
+          await startNewSession();
+          setShowNewSessionConfirm(false);
+        }}
+        isCreating={isCreatingNew}
       />
     </div>
   );

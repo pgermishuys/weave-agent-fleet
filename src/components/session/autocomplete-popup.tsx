@@ -9,7 +9,7 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command";
-import { Terminal, FileText, Folder, Bot, Loader2 } from "lucide-react";
+import { Terminal, FileText, Folder, Bot, Loader2, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type AutocompleteItemGroup = "command" | "file" | "agent";
@@ -50,6 +50,9 @@ const GROUP_ORDER: AutocompleteItemGroup[] = ["command", "agent", "file"];
 
 function ItemIcon({ item }: { item: AutocompleteItem }) {
   if (item.group === "command") {
+    if (item.meta === "fleet") {
+      return <Plus className="h-3.5 w-3.5 shrink-0 text-primary" />;
+    }
     return <Terminal className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />;
   }
   if (item.group === "agent") {

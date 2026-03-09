@@ -5,6 +5,12 @@ import { useCommands } from "@/hooks/use-commands";
 import { useAgents } from "@/hooks/use-agents";
 import { useFindFiles } from "@/hooks/use-find-files";
 import type { AutocompleteItem } from "@/components/session/autocomplete-popup";
+import type { AutocompleteCommand } from "@/lib/api-types";
+
+/** Fleet-native commands shown alongside SDK commands in the autocomplete popup. */
+const FLEET_NATIVE_COMMANDS: AutocompleteCommand[] = [
+  { name: "new", description: "Start a new session in this workspace" },
+];
 
 interface UseAutocompleteParams {
   value: string;
@@ -111,7 +117,8 @@ export function useAutocomplete({
 
     if (computedTrigger.type === "slash") {
       const filter = filterText.toLowerCase();
-      return commands
+      const allCommands = [...FLEET_NATIVE_COMMANDS, ...commands];
+      return allCommands
         .filter((cmd) => cmd.name.toLowerCase().startsWith(filter))
         .map((cmd) => ({
           id: `command:${cmd.name}`,
@@ -119,6 +126,7 @@ export function useAutocomplete({
           description: cmd.description,
           group: "command" as const,
           value: `/${cmd.name} `,
+          meta: FLEET_NATIVE_COMMANDS.some((fc) => fc.name === cmd.name) ? "fleet" : undefined,
         }));
     }
 
