@@ -6,6 +6,8 @@
  * and file explorers.
  */
 
+import { isAbsolute } from "path";
+
 // ── Types ───────────────────────────────────────────────────────────────────
 
 export type ToolCategory = "editor" | "terminal" | "explorer";
@@ -688,6 +690,13 @@ export function getSpawnCommand(
   args: string[];
   options: { detached: boolean; stdio: "ignore"; cwd?: string; shell?: boolean; windowsHide?: boolean };
 } | null {
+  // Defense-in-depth: callers must pass a validated, absolute directory path.
+  // The API route validates via validateDirectory() before calling this function,
+  // but we guard here to prevent misuse from any call site.
+  if (!isAbsolute(directory)) {
+    throw new Error("getSpawnCommand requires an absolute directory path");
+  }
+
   const platform = process.platform as PlatformId;
   const override = config?.overrides?.[toolId];
   const customDef = config?.custom?.[toolId];

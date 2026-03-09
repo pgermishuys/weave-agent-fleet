@@ -296,6 +296,12 @@ describe("resolveTools", () => {
 describe("getSpawnCommand", () => {
   const platform = process.platform as "win32" | "darwin" | "linux";
 
+  it("ThrowsForRelativeDirectoryPath", () => {
+    expect(() => getSpawnCommand("explorer", "relative/path", undefined)).toThrow(
+      "getSpawnCommand requires an absolute directory path"
+    );
+  });
+
   it("ReturnsSpawnConfigForKnownBuiltinTool", () => {
     // "explorer" is alwaysAvailable on all platforms
     const result = getSpawnCommand("explorer", "/test/dir", undefined);
