@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Send, Loader2, AlertCircle } from "lucide-react";
@@ -8,11 +8,13 @@ import { useAutocomplete } from "@/hooks/use-autocomplete";
 import { AutocompletePopup } from "@/components/session/autocomplete-popup";
 import { AgentSelector } from "@/components/session/agent-selector";
 import type { AutocompleteAgent } from "@/lib/api-types";
+import { useDraftState } from "@/hooks/use-draft-state";
 
 interface PromptInputProps {
   onSend?: (text: string, agent?: string) => Promise<void>;
   disabled?: boolean;
   sendError?: string;
+  sessionId?: string;
   instanceId?: string;
   agents?: AutocompleteAgent[];
   selectedAgent?: string | null;
@@ -24,19 +26,39 @@ export function PromptInput({
   onSend,
   disabled,
   sendError,
+  sessionId = "",
   instanceId = "",
   agents = [],
   selectedAgent = null,
   onAgentChange,
   onFocusRequest,
 }: PromptInputProps) {
-  const [value, setValue] = useState("");
+  const { text: persistedDraft, setText: persistDraft, clearDraft } = useDraftState(sessionId);
+  const [value, setValue] = useState(persistedDraft);
   const [isSending, setIsSending] = useState(false);
   const [cursorPos, setCursorPos] = useState(0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const historyRef = useRef<string[]>([]);
   const historyIndexRef = useRef<number>(-1);
+
+  // Wrapper that updates both local state and debounced persistence
+  const setValueAndPersist = useCallback(
+    (v: string) => {
+      setValue(v);
+      persistDraft(v);
+    },
+    [persistDraft],
+  );
+
+  // When sessionId changes, sync the local value from the new session's persisted draft
+  const prevSessionIdRef = useRef(sessionId);
+  useEffect(() => {
+    if (prevSessionIdRef.current !== sessionId) {
+      prevSessionIdRef.current = sessionId;
+      setValue(persistedDraft);
+    }
+  }, [sessionId, persistedDraft]);
 
   const isDisabled = disabled || isSending;
 
@@ -54,7 +76,7 @@ export function PromptInput({
 
   const autocomplete = useAutocomplete({
     value,
-    setValue,
+    setValue: setValueAndPersist,
     instanceId,
     inputRef,
     cursorPosition: cursorPos,
@@ -90,6 +112,7 @@ export function PromptInput({
     historyIndexRef.current = -1;
 
     setValue("");
+    clearDraft();
     setIsSending(true);
     try {
       await onSend?.(text, selectedAgent ?? undefined);
@@ -120,7 +143,7 @@ export function PromptInput({
           ? history.length - 1
           : Math.max(0, historyIndexRef.current - 1);
       historyIndexRef.current = newIndex;
-      setValue(history[newIndex]);
+      setValueAndPersist(history[newIndex]);
       return;
     }
 
@@ -131,10 +154,10 @@ export function PromptInput({
       const newIndex = historyIndexRef.current + 1;
       if (newIndex >= history.length) {
         historyIndexRef.current = -1;
-        setValue("");
+        setValueAndPersist("");
       } else {
         historyIndexRef.current = newIndex;
-        setValue(history[newIndex]);
+        setValueAndPersist(history[newIndex]);
       }
       return;
     }
@@ -180,7 +203,7 @@ export function PromptInput({
           rows={1}
           value={value}
           onChange={(e) => {
-            setValue(e.target.value);
+            setValueAndPersist(e.target.value);
             setCursorPos(e.target.selectionStart ?? 0);
             historyIndexRef.current = -1;
           }}

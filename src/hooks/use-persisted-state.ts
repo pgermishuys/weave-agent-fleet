@@ -95,3 +95,17 @@ export function usePersistedState<T>(
 
   return [value, setState];
 }
+
+// ── Key removal utility ──────────────────────────────────────────────────────
+// Removes a key from localStorage, invalidates the snapshot cache, and notifies
+// subscribers so any useSyncExternalStore reading that key re-renders with its
+// default value.
+export function removePersistedKey(key: string): void {
+  try {
+    localStorage.removeItem(key);
+    snapshotCache.delete(key);
+    emitChange(key);
+  } catch {
+    // localStorage unavailable
+  }
+}
