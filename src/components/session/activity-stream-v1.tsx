@@ -41,6 +41,8 @@ interface ActivityStreamV1Props {
   totalMessageCount?: number | null;
   /** Error from the last failed older-messages fetch (null when no error). */
   loadOlderError?: string | null;
+  /** The current page's OpenCode session ID — threaded to TaskDelegationItem for parent breadcrumbs. */
+  currentSessionId?: string;
 }
 
 function toTitleCase(s: string): string {
@@ -56,7 +58,7 @@ function formatDuration(ms: number): string {
 
 // ─── Task Delegation Block ─────────────────────────────────────────────────
 
-function TaskDelegationItem({ part }: { part: AccumulatedToolPart }) {
+function TaskDelegationItem({ part, currentSessionId }: { part: AccumulatedToolPart; currentSessionId?: string }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const state = part.state as any;
   const input = getTaskToolInput(part);
@@ -79,7 +81,7 @@ function TaskDelegationItem({ part }: { part: AccumulatedToolPart }) {
     : "Subagent Task";
 
   const childUrl = childOpencodeSessionId && parentInstanceId
-    ? `/sessions/${encodeURIComponent(childOpencodeSessionId)}?instanceId=${encodeURIComponent(parentInstanceId)}`
+    ? `/sessions/${encodeURIComponent(childOpencodeSessionId)}?instanceId=${encodeURIComponent(parentInstanceId)}${currentSessionId ? `&parentSessionId=${encodeURIComponent(currentSessionId)}` : ""}`
     : null;
 
   // Status summary from part.state (no API calls needed)
@@ -135,10 +137,10 @@ function TaskDelegationItem({ part }: { part: AccumulatedToolPart }) {
 
 // ─── Tool Call Item ─────────────────────────────────────────────────────────
 
-function ToolCallItem({ part }: { part: AccumulatedPart & { type: "tool" } }) {
+function ToolCallItem({ part, currentSessionId }: { part: AccumulatedPart & { type: "tool" }; currentSessionId?: string }) {
   // Delegate task tool calls to the delegation block renderer
   if (isTaskToolCall(part) && getTaskToolInput(part)) {
-    return <TaskDelegationItem part={part} />;
+    return <TaskDelegationItem part={part} currentSessionId={currentSessionId} />;
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -176,6 +178,7 @@ interface MessageItemProps {
   parentCreatedAt?: number;
   highlightQuery?: string;
   isMatchingMessage?: boolean;
+  currentSessionId?: string;
 }
 
 const MessageItem = memo(function MessageItem({
@@ -183,6 +186,7 @@ const MessageItem = memo(function MessageItem({
   agents,
   parentCreatedAt,
   isMatchingMessage,
+  currentSessionId,
 }: MessageItemProps) {
   const isUser = message.role === "user";
   const textParts = message.parts.filter((p) => p.type === "text");
@@ -258,7 +262,7 @@ const MessageItem = memo(function MessageItem({
         {toolParts.length > 0 && (
           <div className="space-y-0.5">
             {toolParts.map((part) => (
-              <ToolCallItem key={part.partId} part={part} />
+              <ToolCallItem key={part.partId} part={part} currentSessionId={currentSessionId} />
             ))}
           </div>
         )}
@@ -309,6 +313,7 @@ export function ActivityStreamV1({
   onLoadOlder,
   totalMessageCount,
   loadOlderError,
+  currentSessionId,
 }: ActivityStreamV1Props) {
   const { scrollRef, isAtBottom, isNearTop, newMessageCount, scrollToBottom, preserveScrollPosition } =
     useScrollAnchor({ messageCount: messages.length });
@@ -467,6 +472,7 @@ export function ActivityStreamV1({
                     parentCreatedAt={message.parentID ? createdAtByMessageId.get(message.parentID) : undefined}
                     highlightQuery={isFiltering ? searchQuery : undefined}
                     isMatchingMessage={isMatchingMessage}
+                    currentSessionId={currentSessionId}
                   />
                 </Fragment>
               );

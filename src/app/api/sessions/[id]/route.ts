@@ -8,6 +8,7 @@ import {
   updateSessionStatus,
   updateSessionTitle,
   getSessionsForInstance,
+  getAnySessionForInstance,
   deleteSession,
   deleteNotificationsForSession,
   deleteCallbacksForSession,
@@ -173,15 +174,22 @@ export async function GET(
         ancestors.push(...walkAncestorChain(dbSession.parent_session_id));
       } else {
         // Session exists in OpenCode but not in Fleet DB — this is a subagent
-        // session spawned by the Task tool within OpenCode. Find the parent by
-        // looking up which Fleet DB session lives on the same OpenCode instance.
-        const instanceSessions = getSessionsForInstance(instanceId);
-        // The parent is the Fleet DB session on this instance whose
-        // opencode_session_id differs from the current subagent session.
-        // Typically there's exactly one Fleet-managed session per instance.
-        const directParent = instanceSessions.find(
-          (s) => s.opencode_session_id !== sessionId
-        );
+        // session spawned by the Task tool within OpenCode.
+
+        // 1. Try explicit parentSessionId hint from query params (set by TaskDelegationItem)
+        const parentSessionIdHint = request.nextUrl.searchParams.get("parentSessionId");
+        let directParent = parentSessionIdHint
+          ? getSessionByOpencodeId(parentSessionIdHint)
+          : undefined;
+
+        // 2. Fallback: find the oldest session on this instance (regardless of status)
+        if (!directParent) {
+          const fallback = getAnySessionForInstance(instanceId);
+          if (fallback && fallback.opencode_session_id !== sessionId) {
+            directParent = fallback;
+          }
+        }
+
         if (directParent) {
           // Include the direct parent itself, then walk its ancestors
           const parentEntry = {

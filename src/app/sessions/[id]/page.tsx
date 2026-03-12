@@ -140,7 +140,11 @@ export default function SessionDetailPage() {
   // (e.g. subagent session wasn't ready on the first attempt).
   const fetchMetadata = useCallback(() => {
     if (!sessionId || !instanceId) return;
-    const url = `/api/sessions/${encodeURIComponent(sessionId)}?instanceId=${encodeURIComponent(instanceId)}`;
+    const parentSessionId = searchParams.get("parentSessionId");
+    let url = `/api/sessions/${encodeURIComponent(sessionId)}?instanceId=${encodeURIComponent(instanceId)}`;
+    if (parentSessionId) {
+      url += `&parentSessionId=${encodeURIComponent(parentSessionId)}`;
+    }
     apiFetch(url)
       .then((r) => {
         if (!r.ok) {
@@ -165,7 +169,7 @@ export default function SessionDetailPage() {
       .catch(() => {
         setIsResumable(true);
       });
-  }, [sessionId, instanceId]);
+  }, [sessionId, instanceId, searchParams]);
 
   // Reset metadata state when sessionId changes (e.g. client-side navigation
   // from a parent session to a child session).  Without this, the stale
@@ -495,6 +499,7 @@ export default function SessionDetailPage() {
                   onLoadOlder={loadOlderMessages}
                   totalMessageCount={totalMessageCount}
                   loadOlderError={loadOlderError}
+                  currentSessionId={sessionId}
                 />
               </div>
               <PromptInput

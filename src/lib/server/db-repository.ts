@@ -347,6 +347,18 @@ export function getSessionsForInstance(instanceId: string): DbSession[] {
 }
 
 /**
+ * Get the oldest session for an instance regardless of status.
+ * Used only for breadcrumb resolution as a last-resort fallback when
+ * the explicit parentSessionId hint is not available.
+ * By ordering by created_at ASC we return the earliest (most likely parent) session.
+ */
+export function getAnySessionForInstance(instanceId: string): DbSession | undefined {
+  return getDb()
+    .prepare("SELECT * FROM sessions WHERE instance_id = ? ORDER BY created_at ASC LIMIT 1")
+    .get(instanceId) as DbSession | undefined;
+}
+
+/**
  * Get all sessions for an instance that are NOT in a terminal state.
  * Used during recovery to cascade instance death to orphaned sessions.
  * Unlike getSessionsForInstance() which only returns active/idle,

@@ -21,6 +21,7 @@ import {
   listActiveSessions,
   updateSessionStatus,
   getSessionsForInstance,
+  getAnySessionForInstance,
   getNonTerminalSessionsForInstance,
   updateSessionForResume,
   deleteSession,
@@ -485,6 +486,61 @@ describe("session repository", () => {
 
     const sessions = getNonTerminalSessionsForInstance(instId);
     expect(sessions.length).toBe(0);
+  });
+
+  // ─── getAnySessionForInstance ──────────────────────────────────────────────
+
+  it("GetAnySessionForInstanceReturnsOldestSession", () => {
+    const { wsId, instId } = setup();
+    const id1 = mkSessionId();
+    const id2 = mkSessionId();
+    insertSession({ id: id1, workspace_id: wsId, instance_id: instId, opencode_session_id: mkOpencodeSessionId(), directory: "/tmp/proj" });
+    insertSession({ id: id2, workspace_id: wsId, instance_id: instId, opencode_session_id: mkOpencodeSessionId(), directory: "/tmp/proj" });
+
+    const result = getAnySessionForInstance(instId);
+    expect(result).toBeDefined();
+    expect(result?.id).toBe(id1); // oldest by created_at
+  });
+
+  it("GetAnySessionForInstanceIncludesTerminalSessions", () => {
+    const { wsId, instId } = setup();
+    const id1 = mkSessionId();
+    insertSession({ id: id1, workspace_id: wsId, instance_id: instId, opencode_session_id: mkOpencodeSessionId(), directory: "/tmp/proj" });
+    updateSessionStatus(id1, "stopped", new Date().toISOString());
+
+    const result = getAnySessionForInstance(instId);
+    expect(result).toBeDefined();
+    expect(result?.id).toBe(id1);
+    expect(result?.status).toBe("stopped");
+  });
+
+  it("GetAnySessionForInstanceIncludesCompletedSessions", () => {
+    const { wsId, instId } = setup();
+    const id1 = mkSessionId();
+    insertSession({ id: id1, workspace_id: wsId, instance_id: instId, opencode_session_id: mkOpencodeSessionId(), directory: "/tmp/proj" });
+    updateSessionStatus(id1, "completed", new Date().toISOString());
+
+    const result = getAnySessionForInstance(instId);
+    expect(result).toBeDefined();
+    expect(result?.id).toBe(id1);
+    expect(result?.status).toBe("completed");
+  });
+
+  it("GetAnySessionForInstanceReturnsUndefinedWhenNoSessions", () => {
+    const result = getAnySessionForInstance("nonexistent-instance");
+    expect(result).toBeUndefined();
+  });
+
+  it("GetAnySessionForInstanceDoesNotReturnSessionsFromOtherInstances", () => {
+    const { wsId, instId } = setup();
+    const otherInstId = mkInstanceId();
+    insertInstance({ id: otherInstId, port: 4201, directory: "/tmp/other", url: "http://localhost:4201" });
+
+    const id1 = mkSessionId();
+    insertSession({ id: id1, workspace_id: wsId, instance_id: otherInstId, opencode_session_id: mkOpencodeSessionId(), directory: "/tmp/other" });
+
+    const result = getAnySessionForInstance(instId);
+    expect(result).toBeUndefined();
   });
 });
 
