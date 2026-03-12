@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { InlineEdit } from "@/components/ui/inline-edit";
 import { LiveSessionCard } from "@/components/fleet/live-session-card";
 import { useRenameWorkspace } from "@/hooks/use-rename-workspace";
+import { useSessionsContext } from "@/contexts/sessions-context";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useTerminateSession } from "@/hooks/use-terminate-session";
 import type { WorkspaceGroup } from "@/hooks/use-workspaces";
@@ -44,6 +45,7 @@ interface SessionGroupProps {
 
 export const SessionGroup = React.memo(function SessionGroup({ group, onTerminate, onNewSession, onResume, onDelete, onAbort, onOpen, resumingSessionId, refetch }: SessionGroupProps) {
   const { renameWorkspace } = useRenameWorkspace();
+  const { patchWorkspaceDisplayName } = useSessionsContext();
   const { terminateSession } = useTerminateSession();
 
   const [collapsedIds, setCollapsedIds] = usePersistedState<string[]>(
@@ -67,12 +69,13 @@ export const SessionGroup = React.memo(function SessionGroup({ group, onTerminat
   const handleRename = useCallback(
     async (newName: string) => {
       try {
+        patchWorkspaceDisplayName(group.workspaceId, newName);
         await renameWorkspace(group.workspaceId, newName, refetch);
       } catch {
         // error surfaced inside useRenameWorkspace
       }
     },
-    [group.workspaceId, renameWorkspace, refetch]
+    [group.workspaceId, renameWorkspace, refetch, patchWorkspaceDisplayName]
   );
 
   const handleTerminateAll = useCallback(async () => {

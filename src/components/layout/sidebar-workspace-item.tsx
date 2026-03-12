@@ -23,6 +23,7 @@ import { NewSessionDialog } from "@/components/session/new-session-dialog";
 import { useRenameWorkspace } from "@/hooks/use-rename-workspace";
 import { useTerminateSession } from "@/hooks/use-terminate-session";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { useSessionsContext } from "@/contexts/sessions-context";
 import { useOpenDirectory } from "@/hooks/use-open-directory";
 import type { OpenTool } from "@/hooks/use-open-directory";
 import { OpenToolContextSubmenu } from "@/components/ui/open-tool-menu";
@@ -49,6 +50,7 @@ export const SidebarWorkspaceItem = React.memo(function SidebarWorkspaceItem({
     : false;
 
   const { renameWorkspace } = useRenameWorkspace();
+  const { patchWorkspaceDisplayName } = useSessionsContext();
   const { terminateSession } = useTerminateSession();
   const { openDirectory } = useOpenDirectory();
 
@@ -61,12 +63,13 @@ export const SidebarWorkspaceItem = React.memo(function SidebarWorkspaceItem({
   const handleRename = useCallback(
     async (newName: string) => {
       try {
+        patchWorkspaceDisplayName(group.workspaceId, newName);
         await renameWorkspace(group.workspaceId, newName, refetch);
       } catch {
         // error surfaced inside useRenameWorkspace
       }
     },
-    [group.workspaceId, renameWorkspace, refetch]
+    [group.workspaceId, renameWorkspace, refetch, patchWorkspaceDisplayName]
   );
 
   const handleTogglePin = useCallback(() => {
