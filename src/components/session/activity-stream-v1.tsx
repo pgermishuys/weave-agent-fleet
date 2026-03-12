@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Bot, User, Wrench, Loader2, AlertCircle, RefreshCw, ChevronDown, ArrowUpRight, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Bot, User, SquareTerminal, Loader2, AlertCircle, RefreshCw, ChevronDown, ArrowUpRight, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useScrollAnchor } from "@/hooks/use-scroll-anchor";
 import { useActivityFilter } from "@/hooks/use-activity-filter";
 import { useKeyboardShortcut } from "@/hooks/use-keyboard-shortcut";
@@ -152,7 +152,7 @@ function ToolCallItem({ part }: { part: AccumulatedPart & { type: "tool" } }) {
       return (
         <div className="py-0.5">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Wrench className="h-3 w-3 shrink-0 text-amber-500" />
+            <SquareTerminal className="h-3 w-3 shrink-0 text-muted-foreground" />
             <span className="font-mono text-amber-500/90">{part.tool}</span>
             {isRunning && <Loader2 className="h-3 w-3 animate-spin" />}
             {todos && !isRunning && (

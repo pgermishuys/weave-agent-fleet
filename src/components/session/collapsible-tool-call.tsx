@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Wrench, Loader2, ChevronRight, ChevronDown, Copy, Check } from "lucide-react";
+import { SquareTerminal, X, Loader2, ChevronRight, ChevronDown, Copy, Check } from "lucide-react";
+import { getToolLabel } from "@/lib/tool-labels";
 import {
   Collapsible,
   CollapsibleTrigger,
@@ -54,15 +55,7 @@ export function CollapsibleToolCall({ part }: CollapsibleToolCallProps) {
   const error: string = state?.error ? String(state.error) : "";
   const input: string = state?.input ? JSON.stringify(state.input) : "";
 
-  const truncatedOutput = isCompleted
-    ? output
-      ? output.slice(0, 60) + (output.length > 60 ? "…" : "")
-      : "done"
-    : isError
-      ? error
-        ? error.slice(0, 60) + (error.length > 60 ? "…" : "")
-        : "error"
-      : "";
+  const label = getToolLabel(part.tool, state?.input ?? null);
 
   const hasExpandableContent = !isRunning && (output || error || input);
 
@@ -96,17 +89,13 @@ export function CollapsibleToolCall({ part }: CollapsibleToolCallProps) {
             <span className="inline-block h-3 w-3 shrink-0" />
           )}
 
-          <Wrench className="h-3 w-3 shrink-0 text-amber-500" />
-          <span className="font-mono text-amber-500/90">{part.tool}</span>
+          <SquareTerminal className="h-3 w-3 shrink-0 text-muted-foreground" />
+          <span className="flex-1 truncate">{label}</span>
+          <span className="font-mono text-muted-foreground/50 shrink-0">{part.tool}</span>
 
-          {isRunning && <Loader2 className="h-3 w-3 animate-spin" />}
-
-          {isCompleted && (
-            <span className="text-green-500/80 truncate">{truncatedOutput}</span>
-          )}
-          {isError && (
-            <span className="text-red-500/80 truncate">{truncatedOutput}</span>
-          )}
+          {isRunning && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground shrink-0" />}
+          {isCompleted && <Check className="h-3 w-3 text-green-500 shrink-0" />}
+          {isError && <X className="h-3 w-3 text-red-500 shrink-0" />}
         </button>
       </CollapsibleTrigger>
 
