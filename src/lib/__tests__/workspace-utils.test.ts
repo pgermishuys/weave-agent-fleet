@@ -338,7 +338,7 @@ describe("groupSessionsByWorkspace", () => {
     expect(groups[0].displayName).toBe("My Cool Project");
   });
 
-  it("sorts groups with running sessions before non-running sessions", () => {
+  it("sorts groups alphabetically regardless of running status", () => {
     const stoppedSession = makeSession({
       instanceId: "inst-stopped",
       workspaceDirectory: "/dir/a-alpha",
@@ -356,8 +356,8 @@ describe("groupSessionsByWorkspace", () => {
 
     const groups = groupSessionsByWorkspace([stoppedSession, runningSession]);
 
-    expect(groups[0].workspaceDirectory).toBe("/dir/z-zeta");
-    expect(groups[1].workspaceDirectory).toBe("/dir/a-alpha");
+    expect(groups[0].workspaceDirectory).toBe("/dir/a-alpha");
+    expect(groups[1].workspaceDirectory).toBe("/dir/z-zeta");
   });
 
   it("sorts non-running groups alphabetically by displayName", () => {

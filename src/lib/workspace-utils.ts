@@ -31,7 +31,7 @@ export function deriveDisplayName(item: SessionListItem): string {
 /**
  * Groups a flat list of sessions into workspace groups, keyed by directory path.
  * Multiple workspace IDs pointing at the same directory are merged into one group.
- * Groups are sorted: running workspaces first, then alphabetical by display name.
+ * Groups are sorted alphabetically by display name.
  */
 export function groupSessionsByWorkspace(
   sessions: SessionListItem[]
@@ -78,12 +78,7 @@ export function groupSessionsByWorkspace(
 
   const groups = Array.from(map.values());
 
-  groups.sort((a, b) => {
-    if (a.hasRunningSession !== b.hasRunningSession) {
-      return a.hasRunningSession ? -1 : 1;
-    }
-    return a.displayName.localeCompare(b.displayName);
-  });
+  groups.sort((a, b) => a.displayName.localeCompare(b.displayName));
 
   return groups;
 }

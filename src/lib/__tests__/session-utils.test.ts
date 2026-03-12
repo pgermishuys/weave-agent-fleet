@@ -126,12 +126,12 @@ describe("nestSessions", () => {
     const c = makeItem({ sessionId: "c", dbId: "db-c" });
     const childOfA = makeItem({ sessionId: "ca", parentSessionId: "db-a" });
 
-    const result = nestSessions([a, b, c, childOfA]);
+    const result = nestSessions([c, b, a, childOfA]);
 
     expect(result.length).toBe(3);
-    expect(result[0]!.item.session.id).toBe("a");
+    expect(result[0]!.item.session.id).toBe("c");
     expect(result[1]!.item.session.id).toBe("b");
-    expect(result[2]!.item.session.id).toBe("c");
+    expect(result[2]!.item.session.id).toBe("a");
   });
 
   it("ParentWithDbIdButNoChildrenHasEmptyArray", () => {
@@ -140,6 +140,65 @@ describe("nestSessions", () => {
 
     expect(result.length).toBe(1);
     expect(result[0]!.children).toEqual([]);
+  });
+
+  it("sorts top-level sessions alphabetically by title when sort option is true", () => {
+    const charlie = makeItem({ sessionId: "s1", session: { id: "s1", title: "Charlie" } as SessionListItem["session"] });
+    const alpha = makeItem({ sessionId: "s2", session: { id: "s2", title: "Alpha" } as SessionListItem["session"] });
+    const bravo = makeItem({ sessionId: "s3", session: { id: "s3", title: "Bravo" } as SessionListItem["session"] });
+
+    const result = nestSessions([charlie, alpha, bravo], { sort: true });
+
+    expect(result.length).toBe(3);
+    expect(result[0]!.item.session.title).toBe("Alpha");
+    expect(result[1]!.item.session.title).toBe("Bravo");
+    expect(result[2]!.item.session.title).toBe("Charlie");
+  });
+
+  it("sorts children within a parent alphabetically by title when sort option is true", () => {
+    const parent = makeItem({ sessionId: "p", dbId: "db-p", session: { id: "p", title: "Parent" } as SessionListItem["session"] });
+    const zeta = makeItem({ sessionId: "z", parentSessionId: "db-p", session: { id: "z", title: "Zeta" } as SessionListItem["session"] });
+    const alphaChild = makeItem({ sessionId: "a", parentSessionId: "db-p", session: { id: "a", title: "Alpha" } as SessionListItem["session"] });
+    const mu = makeItem({ sessionId: "m", parentSessionId: "db-p", session: { id: "m", title: "Mu" } as SessionListItem["session"] });
+
+    const result = nestSessions([parent, zeta, alphaChild, mu], { sort: true });
+
+    expect(result.length).toBe(1);
+    expect(result[0]!.children.length).toBe(3);
+    expect(result[0]!.children[0]!.session.title).toBe("Alpha");
+    expect(result[0]!.children[1]!.session.title).toBe("Mu");
+    expect(result[0]!.children[2]!.session.title).toBe("Zeta");
+  });
+
+  it("falls back to session.id for sorting when title is empty", () => {
+    const bById = makeItem({ sessionId: "b-session", session: { id: "b-session", title: "" } as SessionListItem["session"] });
+    const aById = makeItem({ sessionId: "a-session", session: { id: "a-session", title: "" } as SessionListItem["session"] });
+    const cById = makeItem({ sessionId: "c-session", session: { id: "c-session", title: "" } as SessionListItem["session"] });
+
+    const result = nestSessions([bById, aById, cById], { sort: true });
+
+    expect(result.length).toBe(3);
+    expect(result[0]!.item.session.id).toBe("a-session");
+    expect(result[1]!.item.session.id).toBe("b-session");
+    expect(result[2]!.item.session.id).toBe("c-session");
+  });
+
+  it("does not sort when sort option is false or omitted", () => {
+    const charlie = makeItem({ sessionId: "s1", session: { id: "s1", title: "Charlie" } as SessionListItem["session"] });
+    const alpha = makeItem({ sessionId: "s2", session: { id: "s2", title: "Alpha" } as SessionListItem["session"] });
+    const bravo = makeItem({ sessionId: "s3", session: { id: "s3", title: "Bravo" } as SessionListItem["session"] });
+
+    // No options — preserves input order
+    const resultDefault = nestSessions([charlie, alpha, bravo]);
+    expect(resultDefault[0]!.item.session.title).toBe("Charlie");
+    expect(resultDefault[1]!.item.session.title).toBe("Alpha");
+    expect(resultDefault[2]!.item.session.title).toBe("Bravo");
+
+    // sort: false — preserves input order
+    const resultFalse = nestSessions([charlie, alpha, bravo], { sort: false });
+    expect(resultFalse[0]!.item.session.title).toBe("Charlie");
+    expect(resultFalse[1]!.item.session.title).toBe("Alpha");
+    expect(resultFalse[2]!.item.session.title).toBe("Bravo");
   });
 });
 

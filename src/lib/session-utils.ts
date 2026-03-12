@@ -5,6 +5,15 @@ export interface NestedSession {
   children: SessionListItem[];
 }
 
+export interface NestSessionsOptions {
+  /** Sort top-level parents and children alphabetically by title. Default: false. */
+  sort?: boolean;
+}
+
+function sessionSortKey(s: SessionListItem): string {
+  return (s.session.title || s.session.id).toLowerCase();
+}
+
 /**
  * Returns true if the two session arrays differ in any UI-visible field.
  * Used for structural sharing: skip setState when poll data is unchanged.
@@ -36,8 +45,11 @@ export function sessionsChanged(
  * Sessions with a `parentSessionId` that matches a `dbId` in the same list
  * are treated as children of that parent. All other sessions are top-level.
  * Sessions without `dbId` or `parentSessionId` pass through unchanged.
+ *
+ * @param options.sort - When true, sorts top-level items and children
+ *   alphabetically by title (falling back to session.id). Default: false.
  */
-export function nestSessions(items: SessionListItem[]): NestedSession[] {
+export function nestSessions(items: SessionListItem[], options?: NestSessionsOptions): NestedSession[] {
   // Build a map of dbId → SessionListItem for parent lookup
   const dbIdMap = new Map<string, SessionListItem>();
   for (const s of items) {
@@ -57,10 +69,23 @@ export function nestSessions(items: SessionListItem[]): NestedSession[] {
   }
 
   // Return top-level items (non-children) with their children attached
-  return items
+  const nested = items
     .filter((s) => !childIds.has(s.session.id))
     .map((s) => ({
       item: s,
       children: s.dbId ? (childrenByParent.get(s.dbId) ?? []) : [],
     }));
+
+  if (options?.sort) {
+    for (const entry of nested) {
+      entry.children.sort((a, b) =>
+        sessionSortKey(a).localeCompare(sessionSortKey(b))
+      );
+    }
+    nested.sort((a, b) =>
+      sessionSortKey(a.item).localeCompare(sessionSortKey(b.item))
+    );
+  }
+
+  return nested;
 }

@@ -157,7 +157,7 @@ export const SidebarWorkspaceItem = React.memo(function SidebarWorkspaceItem({
 
           {/* Session list — always visible */}
           <div className="space-y-0.5 mt-0.5" role="group">
-            {nestSessions(group.sessions).map(({ item, children }) => (
+            {nestSessions(group.sessions, { sort: true }).map(({ item, children }) => (
               <div key={`${item.instanceId}-${item.session.id}`}>
                 <SidebarSessionItem
                   item={item}
