@@ -5,8 +5,12 @@ import type { AccumulatedMessage } from "@/lib/api-types";
 import { convertSDKMessageToAccumulated } from "@/lib/pagination-utils";
 import type { SDKMessage } from "@/lib/pagination-utils";
 import { apiFetch } from "@/lib/api-client";
+import type { PaginationSnapshot } from "@/lib/session-cache";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
+
+// Re-export PaginationSnapshot so consumers can import it from this module.
+export type { PaginationSnapshot } from "@/lib/session-cache";
 
 export interface PaginationState {
   hasMore: boolean;
@@ -37,6 +41,10 @@ export interface UseMessagePaginationReturn extends PaginationState {
   ) => Promise<AccumulatedMessage[]>;
   /** Reset pagination state (e.g. on full reconnect recovery). */
   resetPagination: () => void;
+  /** Returns a snapshot of the current pagination state for cache storage. */
+  snapshotPagination: () => PaginationSnapshot;
+  /** Restores pagination state from a previously captured snapshot. */
+  hydratePagination: (snapshot: PaginationSnapshot) => void;
 }
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -154,6 +162,18 @@ export function useMessagePagination(): UseMessagePaginationReturn {
     lastFetchTime.current = 0;
   }, []);
 
+  const snapshotPagination = useCallback((): PaginationSnapshot => {
+    return { hasMore, oldestMessageId, totalCount };
+  }, [hasMore, oldestMessageId, totalCount]);
+
+  const hydratePagination = useCallback((snapshot: PaginationSnapshot): void => {
+    setHasMore(snapshot.hasMore);
+    setOldestMessageId(snapshot.oldestMessageId);
+    setTotalCount(snapshot.totalCount);
+    // Clear any stale error state from a previous session view.
+    setLoadError(null);
+  }, []);
+
   return {
     hasMore,
     isLoadingOlder,
@@ -163,5 +183,7 @@ export function useMessagePagination(): UseMessagePaginationReturn {
     loadInitialMessages,
     loadOlderMessages,
     resetPagination,
+    snapshotPagination,
+    hydratePagination,
   };
 }

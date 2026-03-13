@@ -73,10 +73,16 @@ export default function SessionDetailPage() {
     null
   );
 
-  const { messages, status, sessionStatus, error, forceIdle, reconnect, reconnectAttempt, hasMoreMessages, isLoadingOlder, loadOlderMessages, totalMessageCount, loadOlderError } = useSessionEvents(
+  // Shared ref: useSessionEvents sets this synchronously before hydrating
+  // cached messages, and useScrollAnchor reads it on the same render to
+  // suppress auto-scroll-to-bottom during cache hydration.
+  const suppressAutoScrollRef = useRef(false);
+
+  const { messages, status, sessionStatus, error, forceIdle, reconnect, reconnectAttempt, hasMoreMessages, isLoadingOlder, loadOlderMessages, totalMessageCount, loadOlderError, cacheHit, initialScrollPosition, scrollPositionRef } = useSessionEvents(
     sessionId,
     instanceId,
-    setSelectedAgent
+    setSelectedAgent,
+    suppressAutoScrollRef,
   );
   const { terminateSession, isTerminating } = useTerminateSession();
   const { abortSession, isAborting } = useAbortSession();
@@ -508,6 +514,10 @@ export default function SessionDetailPage() {
                   totalMessageCount={totalMessageCount}
                   loadOlderError={loadOlderError}
                   currentSessionId={sessionId}
+                  scrollPositionRef={scrollPositionRef}
+                  cacheHit={cacheHit}
+                  initialScrollPosition={initialScrollPosition}
+                  suppressAutoScrollRef={suppressAutoScrollRef}
                 />
               </div>
               <PromptInput

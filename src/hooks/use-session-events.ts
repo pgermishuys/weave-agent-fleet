@@ -16,6 +16,7 @@ import {
 import { useMessagePagination } from "@/hooks/use-message-pagination";
 import { prependMessages, convertSDKMessageToAccumulated } from "@/lib/pagination-utils";
 import type { SDKMessage } from "@/lib/pagination-utils";
+import { sessionCache } from "@/lib/session-cache";
 
 export type SessionConnectionStatus =
   | "connecting"
@@ -46,6 +47,21 @@ export interface UseSessionEventsResult {
   totalMessageCount: number | null;
   /** Error from the last failed older-messages fetch (null when no error). */
   loadOlderError: string | null;
+  /**
+   * Whether this mount was hydrated from the cache (true = skip auto-scroll,
+   * restore saved scroll position instead).
+   */
+  cacheHit: boolean;
+  /**
+   * The scroll position to restore when cacheHit is true.
+   * Null if the cache was invalidated (e.g. gap-fill fell back to full reload).
+   */
+  initialScrollPosition: { scrollTop: number; scrollHeight: number } | null;
+  /**
+   * Ref that the calling component (ActivityStreamV1) should update on every
+   * scroll event so the current scroll position is available on unmount.
+   */
+  scrollPositionRef: React.MutableRefObject<{ scrollTop: number; scrollHeight: number } | null>;
 }
 
 const MAX_RECONNECT_DELAY_MS = 30_000;
@@ -57,13 +73,22 @@ const MAX_MESSAGES = 500;
 export function useSessionEvents(
   sessionId: string,
   instanceId: string,
-  onAgentSwitch?: (agent: string) => void
+  onAgentSwitch?: (agent: string) => void,
+  /**
+   * Optional ref from useScrollAnchor's suppressAutoScroll. When provided,
+   * it is set to `true` synchronously before hydrating cached messages so
+   * that the messageCount auto-scroll effect is suppressed on the same render.
+   */
+  suppressAutoScrollRef?: React.MutableRefObject<boolean>,
 ): UseSessionEventsResult {
   const [messages, setMessages] = useState<AccumulatedMessage[]>([]);
   const [status, setStatus] = useState<SessionConnectionStatus>("connecting");
   const [sessionStatus, setSessionStatus] = useState<"idle" | "busy">("idle");
   const [error, setError] = useState<string | undefined>();
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  // Cache hit state — set on first connect if a valid cache entry exists.
+  const [cacheHit, setCacheHit] = useState(false);
+  const [initialScrollPosition, setInitialScrollPosition] = useState<{ scrollTop: number; scrollHeight: number } | null>(null);
 
   const pagination = useMessagePagination();
   // Destructure stable function references to avoid unstable object identity in deps
@@ -71,6 +96,8 @@ export function useSessionEvents(
     resetPagination,
     loadInitialMessages: paginationLoadInitial,
     loadOlderMessages: paginationLoadOlder,
+    snapshotPagination,
+    hydratePagination,
   } = pagination;
 
   const reconnectDelay = useRef(BASE_RECONNECT_DELAY_MS);
@@ -86,12 +113,37 @@ export function useSessionEvents(
   // Track the last known message ID for incremental reconnect loading
   const lastMessageIdRef = useRef<string | null>(null);
 
+  // ── Refs for accessing current state values in the cleanup closure ──
+  // useState values captured in the cleanup effect are stale (initial values).
+  // We sync them into refs on every render so the cleanup sees current state.
+  const messagesRef = useRef<AccumulatedMessage[]>(messages);
+  const sessionStatusRef = useRef<"idle" | "busy">(sessionStatus);
+  const snapshotPaginationRef = useRef(snapshotPagination);
+  useEffect(() => {
+    messagesRef.current = messages;
+    sessionStatusRef.current = sessionStatus;
+    snapshotPaginationRef.current = snapshotPagination;
+  });
+
+  // The calling component (ActivityStreamV1) writes its current scroll position
+  // here on each scroll so that the cleanup can read the last known position.
+  const scrollPositionRef = useRef<{ scrollTop: number; scrollHeight: number } | null>(null);
+
   /**
    * Fetch existing messages from the API and convert to AccumulatedMessage[].
    * Used on reconnect (to fill gaps) — fetches ALL messages for gap-free state.
+   * Also called as a fallback from loadMessagesSince on error.
+   * When called as a fallback on a cache-hydrated session, it invalidates the
+   * cached scroll position so the caller falls back to auto-scroll-to-bottom.
    */
   const loadAllMessages = useCallback(async (): Promise<void> => {
     if (!sessionId || !instanceId) return;
+    // Gap-fill failed — full reload happening. Clear cache-hit state so the
+    // caller falls back to normal auto-scroll-to-bottom behavior.
+    if (isMounted.current) {
+      setCacheHit(false);
+      setInitialScrollPosition(null);
+    }
     try {
       const url = `/api/sessions/${encodeURIComponent(sessionId)}?instanceId=${encodeURIComponent(instanceId)}`;
       const response = await apiFetch(url);
@@ -134,10 +186,14 @@ export function useSessionEvents(
       const accumulated = data.messages.map(convertSDKMessageToAccumulated);
       setMessages(prev => {
         // Append new messages, avoiding duplicates
-        const existingIds = new Set(prev.map(m => m.messageId));
-        const newMessages = accumulated.filter(m => !existingIds.has(m.messageId));
+        const existingIds = new Set(prev.map((m: AccumulatedMessage) => m.messageId));
+        const newMessages = accumulated.filter((m: AccumulatedMessage) => !existingIds.has(m.messageId));
         const merged = [...prev, ...newMessages];
-        // Apply cap
+        // Apply MAX_MESSAGES cap. When hydrated from cache (up to MAX_MESSAGES entries)
+        // and gap-fill appends new messages, the oldest are trimmed from the front.
+        // The cached oldestMessageId pagination cursor may now point to a trimmed message —
+        // this is acceptable; the next loadOlderMessages call will use the stale cursor and
+        // the API will handle it gracefully by returning from the nearest valid point.
         return merged.length > MAX_MESSAGES
           ? merged.slice(merged.length - MAX_MESSAGES)
           : merged;
@@ -199,11 +255,44 @@ export function useSessionEvents(
           }
         });
       } else {
-        // First connect — load initial batch (paginated) + current status
+        // First connect — check cache before doing a full API load.
         hasConnectedOnce.current = true;
         setStatus("connected");
         setError(undefined);
-        void Promise.all([loadInitialMessages(), loadSessionStatus()]);
+
+        const cached = sessionCache.get(sessionId, instanceId);
+        if (cached) {
+          // ── Cache hit: hydrate instantly then fill the gap ──────────
+          // Suppress auto-scroll BEFORE setting messages so that the
+          // messageCount change effect in useScrollAnchor (which runs on
+          // the same render) does not fire an unwanted scroll-to-bottom.
+          if (suppressAutoScrollRef) {
+            suppressAutoScrollRef.current = true;
+          }
+          setMessages(cached.messages);
+          setSessionStatus(cached.sessionStatus);
+          lastMessageIdRef.current = cached.lastMessageId;
+          hydratePagination(cached.pagination);
+
+          // Expose the saved scroll position to ActivityStreamV1 so it can
+          // restore it after the first render.
+          setCacheHit(true);
+          setInitialScrollPosition({
+            scrollTop: cached.scrollPosition,
+            scrollHeight: cached.scrollHeight,
+          });
+
+          // Gap-fill: fetch any messages that arrived while viewing another session.
+          // If this falls back to loadAllMessages (network error), cacheHit will
+          // be cleared and scroll restore suppressed.
+          void Promise.all([
+            loadMessagesSince(cached.lastMessageId),
+            loadSessionStatus(),
+          ]);
+        } else {
+          // ── Cache miss: normal slow path ────────────────────────────
+          void Promise.all([loadInitialMessages(), loadSessionStatus()]);
+        }
       }
     };
 
@@ -223,7 +312,7 @@ export function useSessionEvents(
       es.close();
       eventSourceRef.current = null;
 
-      setReconnectAttempt((prev) => {
+      setReconnectAttempt((prev: number) => {
         const next = prev + 1;
         if (next >= MAX_RECONNECT_ATTEMPTS) {
           setStatus("abandoned");
@@ -239,7 +328,7 @@ export function useSessionEvents(
         return next;
       });
     };
-  }, [sessionId, instanceId, loadMessagesSince, loadInitialMessages, loadSessionStatus]);
+  }, [sessionId, instanceId, loadMessagesSince, loadInitialMessages, loadSessionStatus, hydratePagination, suppressAutoScrollRef]);
 
   useEffect(() => {
     connectRef.current = connect;
@@ -251,6 +340,25 @@ export function useSessionEvents(
     connect();
     return () => {
       isMounted.current = false;
+
+      // ── Save current state to cache before unmounting ─────────────
+      // Capture values from refs (not useState, which would be stale in closure).
+      // Guard: only save if we actually have messages. A rapid mount→unmount
+      // (before SSE connects) would otherwise overwrite a valid previous
+      // cache entry with an empty messages array.
+      if (messagesRef.current.length > 0) {
+        const scrollPos = scrollPositionRef.current;
+        sessionCache.set(sessionId, instanceId, {
+          messages: messagesRef.current,
+          scrollPosition: scrollPos?.scrollTop ?? 0,
+          scrollHeight: scrollPos?.scrollHeight ?? 0,
+          sessionStatus: sessionStatusRef.current,
+          lastMessageId: lastMessageIdRef.current,
+          pagination: snapshotPaginationRef.current(),
+          timestamp: Date.now(),
+        });
+      }
+
       eventSourceRef.current?.close();
       eventSourceRef.current = null;
       if (reconnectTimerRef.current) {
@@ -266,7 +374,7 @@ export function useSessionEvents(
     if (!sessionId || !instanceId) return;
     const older = await paginationLoadOlder(sessionId, instanceId);
     if (older.length > 0) {
-      setMessages((prev) => prependMessages(prev, older));
+      setMessages((prev: AccumulatedMessage[]) => prependMessages(prev, older));
     }
   }, [sessionId, instanceId, paginationLoadOlder]);
 
@@ -299,6 +407,9 @@ export function useSessionEvents(
     loadOlderMessages,
     totalMessageCount: pagination.totalCount,
     loadOlderError: pagination.loadError,
+    cacheHit,
+    initialScrollPosition,
+    scrollPositionRef,
   };
 }
 

@@ -43,6 +43,29 @@ interface ActivityStreamV1Props {
   loadOlderError?: string | null;
   /** The current page's OpenCode session ID — threaded to TaskDelegationItem for parent breadcrumbs. */
   currentSessionId?: string;
+  /**
+   * Ref written by the calling component with the current scroll position.
+   * ActivityStreamV1 keeps this up to date on every scroll so that the parent
+   * can read the last known position on unmount for cache storage.
+   */
+  scrollPositionRef?: React.MutableRefObject<{ scrollTop: number; scrollHeight: number } | null>;
+  /**
+   * Whether this session was hydrated from the cache.
+   * When true, auto-scroll is suppressed and initialScrollPosition is restored.
+   */
+  cacheHit?: boolean;
+  /**
+   * The scroll position to restore when cacheHit is true.
+   * Null if the cache was invalidated (gap-fill fell back to full reload).
+   */
+  initialScrollPosition?: { scrollTop: number; scrollHeight: number } | null;
+  /**
+   * External ref for suppressing auto-scroll. Set synchronously by
+   * useSessionEvents before cached messages are hydrated, so that the
+   * messageCount auto-scroll effect in useScrollAnchor is suppressed
+   * on the same render cycle.
+   */
+  suppressAutoScrollRef?: React.MutableRefObject<boolean>;
 }
 
 function toTitleCase(s: string): string {
@@ -314,9 +337,13 @@ export function ActivityStreamV1({
   totalMessageCount,
   loadOlderError,
   currentSessionId,
+  scrollPositionRef,
+  cacheHit,
+  initialScrollPosition,
+  suppressAutoScrollRef,
 }: ActivityStreamV1Props) {
-  const { scrollRef, isAtBottom, isNearTop, newMessageCount, scrollToBottom, preserveScrollPosition } =
-    useScrollAnchor({ messageCount: messages.length });
+  const { scrollRef, isAtBottom, isNearTop, newMessageCount, scrollToBottom, preserveScrollPosition, getScrollPosition, restoreScrollPosition, suppressAutoScroll: suppressAutoScrollLocalRef } =
+    useScrollAnchor({ messageCount: messages.length, externalSuppressAutoScroll: suppressAutoScrollRef });
 
   // Guard against double-firing onLoadOlder while isNearTop stays true
   const hasFiredLoadOlderRef = useRef(false);
@@ -337,6 +364,53 @@ export function ActivityStreamV1({
       });
     }
   }, [isNearTop, hasMoreMessages, isLoadingOlder, onLoadOlder, preserveScrollPosition]);
+
+  // ── Cache scroll restore: suppress auto-scroll and restore position ───────
+  // Set suppressAutoScroll before the first render that delivers cached messages,
+  // then restore the scroll position after mount.
+  const scrollRestoreAttemptedRef = useRef(false);
+  useEffect(() => {
+    if (!cacheHit || scrollRestoreAttemptedRef.current) return;
+    scrollRestoreAttemptedRef.current = true;
+
+    // Suppress auto-scroll triggered by the initial batch of cached messages.
+    suppressAutoScrollLocalRef.current = true;
+
+    if (initialScrollPosition) {
+      // Defer to let the DOM render the cached messages before scrolling.
+      requestAnimationFrame(() => {
+        restoreScrollPosition(initialScrollPosition);
+        suppressAutoScrollLocalRef.current = false;
+      });
+    } else {
+      // Cache was invalidated (gap-fill fell back to full reload) — allow
+      // normal auto-scroll-to-bottom behavior.
+      suppressAutoScrollLocalRef.current = false;
+    }
+  }, [cacheHit, initialScrollPosition, restoreScrollPosition, suppressAutoScrollLocalRef]);
+
+  // ── Keep scrollPositionRef up to date with the latest scroll position ─────
+  // This ref is read by useSessionEvents on unmount to save to the cache.
+  // We capture position on every scroll event (including between renders)
+  // via a document-level capture listener.
+  useEffect(() => {
+    if (!scrollPositionRef) return;
+    const handleScroll = () => {
+      const pos = getScrollPosition();
+      if (pos !== null) {
+        scrollPositionRef.current = pos;
+      }
+    };
+    // Capture initial position before any scroll events fire.
+    handleScroll();
+    // The scroll event fires on the viewport element inside the ScrollArea.
+    // We add it on the document level with capture:true to intercept all scroll events
+    // since we don't have direct access to the inner viewport here.
+    document.addEventListener("scroll", handleScroll, { capture: true, passive: true });
+    return () => {
+      document.removeEventListener("scroll", handleScroll, { capture: true });
+    };
+  }, [scrollPositionRef, getScrollPosition]);
 
   const {
     searchQuery,

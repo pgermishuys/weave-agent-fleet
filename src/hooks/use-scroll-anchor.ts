@@ -14,6 +14,15 @@ export interface UseScrollAnchorOptions {
    * increment the unseen counter when scrolled away from bottom.
    */
   messageCount: number;
+  /**
+   * Optional external ref for suppressing auto-scroll. When provided,
+   * the hook uses this ref instead of creating its own internal one.
+   * This allows the caller to set the flag synchronously before a
+   * state update that changes messageCount (e.g. cache hydration in
+   * useSessionEvents), ensuring the suppress flag is already true
+   * when the messageCount effect runs on the same render cycle.
+   */
+  externalSuppressAutoScroll?: React.MutableRefObject<boolean>;
 }
 
 export interface UseScrollAnchorReturn {
@@ -33,6 +42,23 @@ export interface UseScrollAnchorReturn {
    * scrollTop by the delta so the visible content doesn't jump.
    */
   preserveScrollPosition: (callback: () => void | Promise<void>) => Promise<void>;
+  /**
+   * Returns the current scroll position of the viewport, or null if the
+   * viewport is not yet mounted.
+   */
+  getScrollPosition: () => { scrollTop: number; scrollHeight: number } | null;
+  /**
+   * Restores a previously captured scroll position.
+   * Uses the ratio approach to account for content height changes (e.g. from gap-fill).
+   * Sets isProgrammaticScrollRef to prevent scroll handler from disengaging auto-scroll.
+   */
+  restoreScrollPosition: (saved: { scrollTop: number; scrollHeight: number }) => void;
+  /**
+   * When set to `true`, the messageCount change effect skips auto-scrolling.
+   * Set this before hydrating cached messages to prevent an unwanted
+   * scroll-to-bottom, then clear it after calling restoreScrollPosition.
+   */
+  suppressAutoScroll: React.MutableRefObject<boolean>;
 }
 
 /**
@@ -45,6 +71,7 @@ export interface UseScrollAnchorReturn {
  */
 export function useScrollAnchor({
   messageCount,
+  externalSuppressAutoScroll,
 }: UseScrollAnchorOptions): UseScrollAnchorReturn {
   const viewportRef = useRef<HTMLElement | null>(null);
   const isAtBottomRef = useRef(true);
@@ -59,6 +86,13 @@ export function useScrollAnchor({
    * scrolls should do that.
    */
   const isProgrammaticScrollRef = useRef(false);
+  /**
+   * When true, the messageCount effect skips auto-scroll entirely.
+   * Set before hydrating cached messages; cleared after restoreScrollPosition.
+   * Uses the external ref if provided, otherwise creates an internal one.
+   */
+  const internalSuppressAutoScroll = useRef(false);
+  const suppressAutoScroll = externalSuppressAutoScroll ?? internalSuppressAutoScroll;
 
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [isNearTop, setIsNearTop] = useState(false);
@@ -174,6 +208,10 @@ export function useScrollAnchor({
 
     if (delta <= 0) return; // no new messages
 
+    // When suppressAutoScroll is set, skip all auto-scroll logic.
+    // This is used during cache hydration to prevent an unwanted scroll-to-bottom.
+    if (suppressAutoScroll.current) return;
+
     if (isAtBottomRef.current) {
       // User is at the bottom → auto-scroll to keep them there.
       const el = viewportRef.current;
@@ -195,7 +233,7 @@ export function useScrollAnchor({
       // User is scrolled up → increment the unseen badge counter.
       setNewMessageCount((prev) => prev + delta);
     }
-  }, [messageCount]);
+  }, [messageCount, suppressAutoScroll]);
 
   // —— Cleanup on unmount ——————————————————————————————————————————
   useEffect(() => {
@@ -239,5 +277,42 @@ export function useScrollAnchor({
     [],
   );
 
-  return { scrollRef, isAtBottom, isNearTop, newMessageCount, scrollToBottom, preserveScrollPosition };
+  // —— Get / restore scroll position for cache save/restore ─────────
+
+  const getScrollPosition = useCallback(
+    (): { scrollTop: number; scrollHeight: number } | null => {
+      const el = viewportRef.current;
+      if (!el) return null;
+      return { scrollTop: el.scrollTop, scrollHeight: el.scrollHeight };
+    },
+    [],
+  );
+
+  const restoreScrollPosition = useCallback(
+    (saved: { scrollTop: number; scrollHeight: number }): void => {
+      const el = viewportRef.current;
+      if (!el) return;
+
+      isProgrammaticScrollRef.current = true;
+
+      // Adjust for any content added by gap-fill since the snapshot was taken.
+      const currentScrollHeight = el.scrollHeight;
+      const newScrollTop = saved.scrollTop + (currentScrollHeight - saved.scrollHeight);
+      el.scrollTop = newScrollTop;
+
+      // Update isAtBottom based on the restored position.
+      const atBottom = checkIsAtBottom(el);
+      isAtBottomRef.current = atBottom;
+      setIsAtBottom(atBottom);
+      if (atBottom) setNewMessageCount(0);
+
+      // Clear the programmatic guard after the browser has processed the scroll.
+      setTimeout(() => {
+        isProgrammaticScrollRef.current = false;
+      }, 300);
+    },
+    [checkIsAtBottom],
+  );
+
+  return { scrollRef, isAtBottom, isNearTop, newMessageCount, scrollToBottom, preserveScrollPosition, getScrollPosition, restoreScrollPosition, suppressAutoScroll };
 }

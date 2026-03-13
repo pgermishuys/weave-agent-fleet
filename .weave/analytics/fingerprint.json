@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-07T08:57:17.748Z",
+  "generatedAt": "2026-03-13T18:39:03.802Z",
   "stack": [
     {
       "name": "typescript",
@@ -30,6 +30,7 @@
   "isMonorepo": false,
   "packageManager": "npm",
   "primaryLanguage": "typescript",
-  "os": "win32",
-  "arch": "x64"
+  "os": "darwin",
+  "arch": "arm64",
+  "weaveVersion": "0.6.4"
 }
