@@ -4,7 +4,7 @@ import { join } from "path";
 import { randomUUID } from "crypto";
 import { homedir } from "os";
 import { resolve } from "path";
-import { allocatePort, releasePort, _resetForTests, validateDirectory, getAllowedRoots, getEnvRoots, buildAgentModelConfig } from "@/lib/server/process-manager";
+import { allocatePort, releasePort, _resetForTests, validateDirectory, getAllowedRoots, getEnvRoots, buildAgentModelConfig, _tcpPortAliveForTests } from "@/lib/server/process-manager";
 import { _resetDbForTests } from "@/lib/server/database";
 import { getInstance as getDbInstance, getRunningInstances, insertWorkspaceRoot } from "@/lib/server/db-repository";
 import { createSecureTempDir, writeTempFile } from "./test-temp-utils";
@@ -400,5 +400,41 @@ describe("buildAgentModelConfig", () => {
         tapestry: { model: "openai/gpt-4.1" },
       },
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// tcpPortAlive — TCP probe tests
+// ---------------------------------------------------------------------------
+
+describe("tcpPortAlive", () => {
+  it("ReturnsTrueWhenServerIsListening", async () => {
+    const { createServer: createTcpServer } = await import("net");
+    const server = createTcpServer();
+    await new Promise<void>((resolve) => {
+      server.listen(0, "127.0.0.1", () => resolve());
+    });
+    const addr = server.address();
+    const port = typeof addr === "object" && addr ? addr.port : 0;
+
+    try {
+      const alive = await _tcpPortAliveForTests(port, 5000);
+      expect(alive).toBe(true);
+    } finally {
+      server.close();
+    }
+  });
+
+  it("ReturnsFalseWhenNothingIsListening", async () => {
+    // Port 1 is almost certainly not in use and requires root to bind
+    const alive = await _tcpPortAliveForTests(1, 1000);
+    expect(alive).toBe(false);
+  });
+
+  it("ReturnsFalseWhenTimeoutIsVeryShort", async () => {
+    // Use a non-routable IP-like port scenario — timeout should fire
+    // Port 1 with a 1ms timeout should fail fast
+    const alive = await _tcpPortAliveForTests(1, 1);
+    expect(alive).toBe(false);
   });
 });
