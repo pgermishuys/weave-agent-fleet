@@ -4,8 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   LayoutGrid,
   Settings,
-  Bell,
-  History,
   PanelLeftClose,
   Plus,
   RefreshCw,
@@ -38,8 +36,6 @@ const COMMANDS: CommandMeta[] = [
   { id: "interrupt-session", label: "Interrupt Session", icon: OctagonX,      category: "Session" },
   { id: "nav-fleet",        label: "Go to Fleet",       icon: LayoutGrid,    category: "Navigation" },
   { id: "nav-settings",     label: "Go to Settings",    icon: Settings,      category: "Navigation" },
-  { id: "nav-alerts",       label: "Go to Alerts",      icon: Bell,          category: "Navigation" },
-  { id: "nav-history",      label: "Go to History",     icon: History,       category: "Navigation" },
   { id: "toggle-sidebar",   label: "Toggle Sidebar",    icon: PanelLeftClose,category: "View" },
 ];
 

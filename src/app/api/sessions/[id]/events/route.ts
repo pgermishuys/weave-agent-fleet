@@ -4,11 +4,6 @@ import { getInstance, _recoveryComplete } from "@/lib/server/process-manager";
 import { isRelevantToSession } from "@/lib/event-state";
 import { getSessionByOpencodeId, updateSessionStatus } from "@/lib/server/db-repository";
 import {
-  createSessionCompletedNotification,
-  createSessionErrorNotification,
-  createInputRequiredNotification,
-} from "@/lib/server/notification-service";
-import {
   fireSessionCallbacks,
   fireSessionErrorCallbacks,
 } from "@/lib/server/callback-service";
@@ -112,7 +107,7 @@ export async function GET(
 
           send({ type, properties });
 
-          // Notification triggers (best-effort, after forwarding)
+          // Trigger side effects (best-effort, after forwarding)
           try {
             if (type === "session.status") {
               const statusType: string = properties?.status?.type ?? "";
@@ -128,11 +123,6 @@ export async function GET(
                 const dbSession = getSessionByOpencodeId(sessionId);
                 if (dbSession) {
                   updateSessionStatus(dbSession.id, "idle");
-                  createSessionCompletedNotification(
-                    dbSession.opencode_session_id,
-                    instanceId,
-                    dbSession.title
-                  );
                   void fireSessionCallbacks(dbSession.opencode_session_id, instanceId);
                 }
               }
@@ -141,39 +131,16 @@ export async function GET(
               const dbSession = getSessionByOpencodeId(sessionId);
               if (dbSession) {
                 updateSessionStatus(dbSession.id, "idle");
-                createSessionCompletedNotification(
-                  dbSession.opencode_session_id,
-                  instanceId,
-                  dbSession.title
-                );
                 void fireSessionCallbacks(dbSession.opencode_session_id, instanceId);
               }
             } else if (type === "error") {
               const dbSession = getSessionByOpencodeId(sessionId);
               if (dbSession) {
-                const errorMsg: string =
-                  properties?.message ?? properties?.error ?? "";
-                createSessionErrorNotification(
-                  dbSession.opencode_session_id,
-                  instanceId,
-                  dbSession.title,
-                  errorMsg ? { error: errorMsg } : undefined
-                );
                 void fireSessionErrorCallbacks(dbSession.opencode_session_id, instanceId);
-              }
-            } else if (type.startsWith("permission.")) {
-              const dbSession = getSessionByOpencodeId(sessionId);
-              if (dbSession) {
-                createInputRequiredNotification(
-                  dbSession.opencode_session_id,
-                  instanceId,
-                  dbSession.title,
-                  { permissionType: type }
-                );
               }
             }
           } catch {
-            // Notification failure must never break the SSE stream
+            // Side effect failure must never break the SSE stream
           }
         }
       } catch (err) {

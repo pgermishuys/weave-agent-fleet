@@ -100,7 +100,7 @@ describe("useGlobalSSE singleton", () => {
       expect(_getSubscriberCount()).toBe(1);
       expect(_isConnected()).toBe(true);
       expect(mockInstances).toHaveLength(1);
-      expect(mockInstances[0]!.url).toBe("/api/notifications/stream");
+      expect(mockInstances[0]!.url).toBe("/api/activity-stream");
     });
 
     it("does not create a second EventSource for additional subscribers", () => {
@@ -169,9 +169,9 @@ describe("useGlobalSSE singleton", () => {
     it("dispatches to correct channel only", () => {
       _subscribe();
       const activityCb = vi.fn();
-      const notifCb = vi.fn();
+      const otherCb = vi.fn();
       _addListener("activity_status", activityCb);
-      _addListener("notification", notifCb);
+      _addListener("other_event", otherCb);
 
       const es = mockInstances[0]!;
       es.onmessage!({
@@ -179,19 +179,19 @@ describe("useGlobalSSE singleton", () => {
       } as MessageEvent<string>);
 
       expect(activityCb).toHaveBeenCalledTimes(1);
-      expect(notifCb).not.toHaveBeenCalled();
+      expect(otherCb).not.toHaveBeenCalled();
     });
 
     it("dispatches to multiple callbacks on the same channel", () => {
       _subscribe();
       const cb1 = vi.fn();
       const cb2 = vi.fn();
-      _addListener("notification", cb1);
-      _addListener("notification", cb2);
+      _addListener("activity_status", cb1);
+      _addListener("activity_status", cb2);
 
       const es = mockInstances[0]!;
       es.onmessage!({
-        data: JSON.stringify({ type: "notification", id: "n1" }),
+        data: JSON.stringify({ type: "activity_status", sessionId: "s1" }),
       } as MessageEvent<string>);
 
       expect(cb1).toHaveBeenCalledTimes(1);

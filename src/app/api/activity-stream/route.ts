@@ -1,11 +1,12 @@
 import { NextRequest } from "next/server";
 import { _recoveryComplete } from "@/lib/server/process-manager";
-import { onNotification, onActivityStatus } from "@/lib/server/notification-emitter";
+import { onActivityStatus } from "@/lib/server/activity-emitter";
 
 const KEEPALIVE_INTERVAL_MS = 15_000;
 
-// GET /api/notifications/stream — global SSE endpoint for real-time notification delivery.
-// Clients receive notification events as they're created, eliminating the need for polling.
+// GET /api/activity-stream — global SSE endpoint for real-time activity status delivery.
+// Clients receive activity_status events as sessions transition between busy/idle states,
+// powering real-time sidebar updates without polling.
 export async function GET(request: NextRequest): Promise<Response> {
   await _recoveryComplete;
 
@@ -41,12 +42,6 @@ export async function GET(request: NextRequest): Promise<Response> {
         sendComment("keepalive");
       }, KEEPALIVE_INTERVAL_MS);
 
-      // Subscribe to notification events from the in-memory emitter
-      const unsubscribe = onNotification((notification) => {
-        if (abortController.signal.aborted) return;
-        send({ type: "notification", notification });
-      });
-
       // Subscribe to ephemeral activity status events
       const unsubscribeActivity = onActivityStatus((payload) => {
         if (abortController.signal.aborted) return;
@@ -56,7 +51,6 @@ export async function GET(request: NextRequest): Promise<Response> {
       // Cleanup on abort
       abortController.signal.addEventListener("abort", () => {
         clearInterval(keepalive);
-        unsubscribe();
         unsubscribeActivity();
         try {
           controller.close();

@@ -76,19 +76,6 @@ export function getDb(): Database.Database {
       stopped_at TEXT
     );
 
-    CREATE TABLE IF NOT EXISTS notifications (
-      id TEXT PRIMARY KEY,
-      type TEXT NOT NULL,
-      session_id TEXT,
-      instance_id TEXT,
-      pipeline_id TEXT,
-      message TEXT NOT NULL,
-      read INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);
-    CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
-
     CREATE TABLE IF NOT EXISTS session_callbacks (
       id TEXT PRIMARY KEY,
       source_session_id TEXT NOT NULL,

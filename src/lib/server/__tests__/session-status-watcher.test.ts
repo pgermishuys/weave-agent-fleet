@@ -29,8 +29,8 @@ vi.mock("@/lib/server/db-repository", () => ({
   getActiveChildSessions: vi.fn(() => []),
 }));
 
-// Mock notification-emitter
-vi.mock("@/lib/server/notification-emitter", () => ({
+// Mock activity-emitter
+vi.mock("@/lib/server/activity-emitter", () => ({
   emitActivityStatus: vi.fn(),
 }));
 
@@ -38,7 +38,7 @@ import { ensureWatching, stopWatching, _resetForTests } from "@/lib/server/sessi
 import * as processManager from "@/lib/server/process-manager";
 import * as opencodeClient from "@/lib/server/opencode-client";
 import * as dbRepository from "@/lib/server/db-repository";
-import * as notificationEmitter from "@/lib/server/notification-emitter";
+import * as activityEmitter from "@/lib/server/activity-emitter";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -186,10 +186,10 @@ describe("session-status-watcher", () => {
       });
 
       await vi.waitFor(() => {
-        expect(notificationEmitter.emitActivityStatus).toHaveBeenCalled();
+        expect(activityEmitter.emitActivityStatus).toHaveBeenCalled();
       });
 
-      expect(notificationEmitter.emitActivityStatus).toHaveBeenCalledWith({
+      expect(activityEmitter.emitActivityStatus).toHaveBeenCalledWith({
         sessionId: "oc-sess-1",
         instanceId,
         activityStatus: "busy",
@@ -218,10 +218,10 @@ describe("session-status-watcher", () => {
       });
 
       await vi.waitFor(() => {
-        expect(notificationEmitter.emitActivityStatus).toHaveBeenCalled();
+        expect(activityEmitter.emitActivityStatus).toHaveBeenCalled();
       });
 
-      expect(notificationEmitter.emitActivityStatus).toHaveBeenCalledWith({
+      expect(activityEmitter.emitActivityStatus).toHaveBeenCalledWith({
         sessionId: "oc-sess-2",
         instanceId,
         activityStatus: "idle",
@@ -249,10 +249,10 @@ describe("session-status-watcher", () => {
       });
 
       await vi.waitFor(() => {
-        expect(notificationEmitter.emitActivityStatus).toHaveBeenCalled();
+        expect(activityEmitter.emitActivityStatus).toHaveBeenCalled();
       });
 
-      expect(notificationEmitter.emitActivityStatus).toHaveBeenCalledWith({
+      expect(activityEmitter.emitActivityStatus).toHaveBeenCalledWith({
         sessionId: "oc-sess-3",
         instanceId,
         activityStatus: "idle",
@@ -280,10 +280,10 @@ describe("session-status-watcher", () => {
       });
 
       await vi.waitFor(() => {
-        expect(notificationEmitter.emitActivityStatus).toHaveBeenCalled();
+        expect(activityEmitter.emitActivityStatus).toHaveBeenCalled();
       });
 
-      expect(notificationEmitter.emitActivityStatus).toHaveBeenCalledWith({
+      expect(activityEmitter.emitActivityStatus).toHaveBeenCalledWith({
         sessionId: "oc-sess-4",
         instanceId,
         activityStatus: "waiting_input",
@@ -315,7 +315,7 @@ describe("session-status-watcher", () => {
       // Give the async loop a chance to process
       await new Promise((r) => setTimeout(r, 30));
 
-      expect(notificationEmitter.emitActivityStatus).not.toHaveBeenCalled();
+      expect(activityEmitter.emitActivityStatus).not.toHaveBeenCalled();
       expect(dbRepository.updateSessionStatus).not.toHaveBeenCalled();
 
       mock.end();
@@ -339,7 +339,7 @@ describe("session-status-watcher", () => {
       // Give the async loop a chance to process
       await new Promise((r) => setTimeout(r, 30));
 
-      expect(notificationEmitter.emitActivityStatus).not.toHaveBeenCalled();
+      expect(activityEmitter.emitActivityStatus).not.toHaveBeenCalled();
       expect(dbRepository.updateSessionStatus).not.toHaveBeenCalled();
 
       mock.end();
@@ -394,17 +394,17 @@ describe("session-status-watcher", () => {
       });
 
       await vi.waitFor(() => {
-        expect(notificationEmitter.emitActivityStatus).toHaveBeenCalledTimes(2);
+        expect(activityEmitter.emitActivityStatus).toHaveBeenCalledTimes(2);
       });
 
       // Child gets busy
-      expect(notificationEmitter.emitActivityStatus).toHaveBeenCalledWith({
+      expect(activityEmitter.emitActivityStatus).toHaveBeenCalledWith({
         sessionId: "oc-child-1",
         instanceId,
         activityStatus: "busy",
       });
       // Parent also gets busy (with parent's own IDs)
-      expect(notificationEmitter.emitActivityStatus).toHaveBeenCalledWith({
+      expect(activityEmitter.emitActivityStatus).toHaveBeenCalledWith({
         sessionId: "oc-parent-1",
         instanceId: "inst-parent",
         activityStatus: "busy",
@@ -446,17 +446,17 @@ describe("session-status-watcher", () => {
       });
 
       await vi.waitFor(() => {
-        expect(notificationEmitter.emitActivityStatus).toHaveBeenCalledTimes(2);
+        expect(activityEmitter.emitActivityStatus).toHaveBeenCalledTimes(2);
       });
 
       // Child goes idle
-      expect(notificationEmitter.emitActivityStatus).toHaveBeenCalledWith({
+      expect(activityEmitter.emitActivityStatus).toHaveBeenCalledWith({
         sessionId: "oc-child-2",
         instanceId,
         activityStatus: "idle",
       });
       // Parent also goes idle
-      expect(notificationEmitter.emitActivityStatus).toHaveBeenCalledWith({
+      expect(activityEmitter.emitActivityStatus).toHaveBeenCalledWith({
         sessionId: "oc-parent-2",
         instanceId: "inst-parent",
         activityStatus: "idle",
@@ -500,12 +500,12 @@ describe("session-status-watcher", () => {
       });
 
       await vi.waitFor(() => {
-        expect(notificationEmitter.emitActivityStatus).toHaveBeenCalled();
+        expect(activityEmitter.emitActivityStatus).toHaveBeenCalled();
       });
 
       // Only child gets idle event — parent stays busy
-      expect(notificationEmitter.emitActivityStatus).toHaveBeenCalledTimes(1);
-      expect(notificationEmitter.emitActivityStatus).toHaveBeenCalledWith({
+      expect(activityEmitter.emitActivityStatus).toHaveBeenCalledTimes(1);
+      expect(activityEmitter.emitActivityStatus).toHaveBeenCalledWith({
         sessionId: "oc-child-3",
         instanceId,
         activityStatus: "idle",
@@ -543,12 +543,12 @@ describe("session-status-watcher", () => {
       });
 
       await vi.waitFor(() => {
-        expect(notificationEmitter.emitActivityStatus).toHaveBeenCalled();
+        expect(activityEmitter.emitActivityStatus).toHaveBeenCalled();
       });
 
       // Only child gets the event — terminal parent is not touched
-      expect(notificationEmitter.emitActivityStatus).toHaveBeenCalledTimes(1);
-      expect(notificationEmitter.emitActivityStatus).toHaveBeenCalledWith({
+      expect(activityEmitter.emitActivityStatus).toHaveBeenCalledTimes(1);
+      expect(activityEmitter.emitActivityStatus).toHaveBeenCalledWith({
         sessionId: "oc-child-4",
         instanceId,
         activityStatus: "busy",
@@ -579,11 +579,11 @@ describe("session-status-watcher", () => {
       });
 
       await vi.waitFor(() => {
-        expect(notificationEmitter.emitActivityStatus).toHaveBeenCalled();
+        expect(activityEmitter.emitActivityStatus).toHaveBeenCalled();
       });
 
       // Only child event — no parent lookup
-      expect(notificationEmitter.emitActivityStatus).toHaveBeenCalledTimes(1);
+      expect(activityEmitter.emitActivityStatus).toHaveBeenCalledTimes(1);
       expect(dbRepository.getSession).not.toHaveBeenCalled();
 
       mock.end();

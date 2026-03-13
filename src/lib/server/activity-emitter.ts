@@ -1,16 +1,16 @@
 /**
- * Notification event emitter — in-memory pub/sub for real-time notification delivery.
+ * Activity event emitter — in-memory pub/sub for real-time activity status delivery.
  *
- * The notification service calls `emitNotification()` after inserting a notification.
- * The global SSE stream subscribes via `onNotification()` to push events to clients.
- * Uses the globalThis singleton pattern for Turbopack compatibility.
- *
- * Also carries ephemeral activity status events (busy/idle/waiting_input) that are
+ * Carries ephemeral activity status events (busy/idle/waiting_input) that are
  * NOT persisted to the DB — they're transient signals for real-time sidebar updates.
+ *
+ * The session-status-watcher calls `emitActivityStatus()` after persisting
+ * busy/idle transitions. The global SSE stream subscribes via `onActivityStatus()`
+ * to push events to clients.
+ * Uses the globalThis singleton pattern for Turbopack compatibility.
  */
 
 import { EventEmitter } from "events";
-import type { DbNotification } from "@/lib/api-types";
 import type { SessionActivityStatus } from "@/lib/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -24,32 +24,16 @@ export interface ActivityStatusPayload {
 // ─── Singleton ────────────────────────────────────────────────────────────────
 
 const _g = globalThis as unknown as {
-  __weaveNotificationEmitter?: EventEmitter;
-  __weaveListenerMonitorInterval?: ReturnType<typeof setInterval> | null;
+  __weaveActivityEmitter?: EventEmitter;
+  __weaveActivityListenerMonitorInterval?: ReturnType<typeof setInterval> | null;
 };
 
 function getEmitter(): EventEmitter {
-  if (!_g.__weaveNotificationEmitter) {
-    _g.__weaveNotificationEmitter = new EventEmitter();
-    _g.__weaveNotificationEmitter.setMaxListeners(100); // Support many SSE connections
+  if (!_g.__weaveActivityEmitter) {
+    _g.__weaveActivityEmitter = new EventEmitter();
+    _g.__weaveActivityEmitter.setMaxListeners(100); // Support many SSE connections
   }
-  return _g.__weaveNotificationEmitter;
-}
-
-// ─── Notification events (persisted) ──────────────────────────────────────────
-
-export function emitNotification(notification: DbNotification): void {
-  getEmitter().emit("notification", notification);
-}
-
-export function onNotification(
-  callback: (notification: DbNotification) => void
-): () => void {
-  const emitter = getEmitter();
-  emitter.on("notification", callback);
-  return () => {
-    emitter.off("notification", callback);
-  };
+  return _g.__weaveActivityEmitter;
 }
 
 // ─── Activity status events (ephemeral — not persisted) ───────────────────────
@@ -74,10 +58,9 @@ const LISTENER_WARN_THRESHOLD = 50;
 const LISTENER_MONITOR_INTERVAL_MS = 60_000;
 
 /** Get current listener counts by event type. */
-export function getListenerCounts(): { notification: number; activity_status: number } {
+export function getListenerCounts(): { activity_status: number } {
   const emitter = getEmitter();
   return {
-    notification: emitter.listenerCount("notification"),
     activity_status: emitter.listenerCount("activity_status"),
   };
 }
@@ -88,13 +71,13 @@ export function getListenerCounts(): { notification: number; activity_status: nu
  * Idempotent — only one monitor runs at a time.
  */
 export function startListenerMonitoring(): void {
-  if (_g.__weaveListenerMonitorInterval) return;
-  _g.__weaveListenerMonitorInterval = setInterval(() => {
+  if (_g.__weaveActivityListenerMonitorInterval) return;
+  _g.__weaveActivityListenerMonitorInterval = setInterval(() => {
     const counts = getListenerCounts();
-    const total = counts.notification + counts.activity_status;
+    const total = counts.activity_status;
     if (total > LISTENER_WARN_THRESHOLD) {
       console.warn(
-        `[notification-emitter] High listener count: ${total} (notification: ${counts.notification}, activity_status: ${counts.activity_status}). Possible leak.`
+        `[activity-emitter] High listener count: ${total} (activity_status: ${counts.activity_status}). Possible leak.`
       );
     }
   }, LISTENER_MONITOR_INTERVAL_MS);
@@ -102,9 +85,9 @@ export function startListenerMonitoring(): void {
 
 /** Stop the listener monitoring interval. */
 export function stopListenerMonitoring(): void {
-  if (_g.__weaveListenerMonitorInterval) {
-    clearInterval(_g.__weaveListenerMonitorInterval);
-    _g.__weaveListenerMonitorInterval = null;
+  if (_g.__weaveActivityListenerMonitorInterval) {
+    clearInterval(_g.__weaveActivityListenerMonitorInterval);
+    _g.__weaveActivityListenerMonitorInterval = null;
   }
 }
 

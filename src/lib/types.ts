@@ -105,7 +105,6 @@ export type EventType =
   | "tool_result"
   | "plan_progress"
   | "status_change"
-  | "notification"
   | "cost_update";
 
 export interface SessionEvent {
@@ -204,27 +203,6 @@ export interface QueueItem {
   createdAt: Date;
   startedAt?: Date;
   completedAt?: Date;
-}
-
-// === Notifications ===
-
-export type NotificationType =
-  | "input_required"
-  | "session_completed"
-  | "session_error"
-  | "session_disconnected"
-  | "cost_threshold"
-  | "pipeline_stage_complete";
-
-export interface Notification {
-  id: string;
-  type: NotificationType;
-  sessionId?: string;
-  instanceId?: string;
-  pipelineId?: string;
-  message: string;
-  read: boolean;
-  createdAt: Date;
 }
 
 // === Aggregates ===

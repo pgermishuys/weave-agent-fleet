@@ -26,9 +26,6 @@ import {
   updateSessionForResume,
   deleteSession,
   getSessionsForWorkspace,
-  insertNotification,
-  deleteNotificationsForSession,
-  listNotifications,
   insertSessionCallback,
   getPendingCallbacksForSession,
   markCallbackFired,
@@ -619,42 +616,6 @@ describe("session deletion", () => {
     const ids = sessions.map((s) => s.id);
     expect(ids).toContain(id1);
     expect(ids).toContain(id2);
-  });
-
-  it("DeleteNotificationsForSessionRemovesMatchingNotifications", () => {
-    const sessionId = randomUUID();
-    const otherSessionId = randomUUID();
-
-    insertNotification({ id: randomUUID(), type: "info", message: "msg1", session_id: sessionId });
-    insertNotification({ id: randomUUID(), type: "info", message: "msg2", session_id: sessionId });
-    insertNotification({ id: randomUUID(), type: "info", message: "msg3", session_id: otherSessionId });
-    insertNotification({ id: randomUUID(), type: "info", message: "msg4" }); // no session_id
-
-    deleteNotificationsForSession(sessionId);
-
-    const remaining = listNotifications() as { session_id: string | null; message: string }[];
-    const messages = remaining.map((n) => n.message);
-    expect(messages).not.toContain("msg1");
-    expect(messages).not.toContain("msg2");
-    expect(messages).toContain("msg3");
-    expect(messages).toContain("msg4");
-  });
-
-  it("DeleteNotificationsForSessionReturnsDeletedCount", () => {
-    const sessionId = randomUUID();
-
-    insertNotification({ id: randomUUID(), type: "info", message: "a", session_id: sessionId });
-    insertNotification({ id: randomUUID(), type: "info", message: "b", session_id: sessionId });
-    insertNotification({ id: randomUUID(), type: "info", message: "c", session_id: sessionId });
-
-    const count = deleteNotificationsForSession(sessionId);
-
-    expect(count).toBe(3);
-  });
-
-  it("DeleteNotificationsForSessionReturnsZeroWhenNoneMatch", () => {
-    const count = deleteNotificationsForSession("nonexistent-session-id");
-    expect(count).toBe(0);
   });
 });
 

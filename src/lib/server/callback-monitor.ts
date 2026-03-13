@@ -18,7 +18,6 @@ import {
   getAllPendingCallbacks,
   claimPendingCallback,
   getSession,
-  getSessionByOpencodeId,
   updateSessionStatus,
 } from "./db-repository";
 import { getInstance, _recoveryComplete } from "./process-manager";
@@ -27,10 +26,6 @@ import {
   fireSessionCallbacks,
   fireSessionErrorCallbacks,
 } from "./callback-service";
-import {
-  createSessionCompletedNotification,
-  type NotificationContext,
-} from "./notification-service";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -124,14 +119,6 @@ async function processEventStream(
               ) {
                 try {
                   updateSessionStatus(dbSessionId, "idle");
-                  const sessionTitle = getSession(dbSessionId)?.title ?? "Child session";
-                  const ctx: NotificationContext = { directory: sub.directory };
-                  createSessionCompletedNotification(
-                    eventSessionId,
-                    instanceId,
-                    sessionTitle,
-                    ctx
-                  );
                   void fireSessionCallbacks(eventSessionId, instanceId);
                 } catch (err) {
                   console.error(
@@ -161,14 +148,6 @@ async function processEventStream(
             ) {
               try {
                 updateSessionStatus(dbSessionId, "idle");
-                const sessionTitle = getSession(dbSessionId)?.title ?? "Child session";
-                const ctx: NotificationContext = { directory: sub.directory };
-                createSessionCompletedNotification(
-                  eventSessionId,
-                  instanceId,
-                  sessionTitle,
-                  ctx
-                );
                 void fireSessionCallbacks(eventSessionId, instanceId);
               } catch (err) {
                 console.error(
@@ -350,12 +329,6 @@ export function startMonitoring(
         const dbSession = getSession(dbSessionId);
         if (dbSession) {
           updateSessionStatus(dbSessionId, "idle");
-          createSessionCompletedNotification(
-            opencodeSessionId,
-            instanceId,
-            dbSession.title,
-            { directory: instance.directory }
-          );
           void fireSessionCallbacks(opencodeSessionId, instanceId);
         }
         stopMonitoringSession(dbSessionId);
@@ -467,12 +440,6 @@ export function startCallbackPollingLoop(): void {
               if (sourceSession.status !== "idle") {
                 updateSessionStatus(sourceSession.id, "idle");
               }
-              createSessionCompletedNotification(
-                sourceSession.opencode_session_id,
-                instanceId,
-                sourceSession.title,
-                { directory: instance.directory }
-              );
               // Stop monitoring if we were monitoring
               stopMonitoringSession(sourceSession.id);
             }

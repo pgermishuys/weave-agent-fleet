@@ -3,7 +3,6 @@
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { NewSessionDialog } from "@/components/session/new-session-dialog";
-import { NotificationBell } from "@/components/notifications/notification-bell";
 import { useCurrentSessionDirectory } from "@/hooks/use-current-session-directory";
 
 interface HeaderProps {
@@ -23,7 +22,6 @@ export function Header({ title, subtitle, actions }: HeaderProps) {
       </div>
       <div className="flex items-center gap-2">
         {actions}
-        <NotificationBell />
       </div>
     </header>
   );

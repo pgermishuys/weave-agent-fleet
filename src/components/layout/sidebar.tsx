@@ -6,8 +6,6 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   LayoutGrid,
-  Bell,
-  History,
   Settings,
   AlertTriangle,
   PanelLeftClose,
@@ -15,13 +13,11 @@ import {
   Plus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useNotifications } from "@/contexts/notifications-context";
 import { useSessionsContext } from "@/contexts/sessions-context";
 import { useWorkspaces } from "@/hooks/use-workspaces";
 import {
@@ -37,7 +33,6 @@ import { useCurrentSessionDirectory } from "@/hooks/use-current-session-director
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { unreadCount } = useNotifications();
   const { sessions, error, refetch } = useSessionsContext();
   const workspaces = useWorkspaces(sessions);
   const {
@@ -301,85 +296,6 @@ export function Sidebar() {
           </>
         )}
 
-        {/* Alerts */}
-        {collapsed ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Link
-                href="/alerts"
-                aria-label={
-                  unreadCount > 0 ? `Alerts, ${unreadCount} unread` : "Alerts"
-                }
-                className={cn(
-                  "relative flex items-center justify-center rounded-md py-2 text-sm font-medium transition-colors",
-                  pathname.startsWith("/alerts")
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
-                )}
-              >
-                <Bell className="h-4 w-4 shrink-0" />
-                {unreadCount > 0 && (
-                  <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-destructive" />
-                )}
-              </Link>
-            </TooltipTrigger>
-            <TooltipContent side="right">Alerts</TooltipContent>
-          </Tooltip>
-        ) : (
-          <Link
-            href="/alerts"
-            className={cn(
-              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-              pathname.startsWith("/alerts")
-                ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
-            )}
-          >
-            <Bell className="h-4 w-4" />
-            <span className="flex-1 whitespace-nowrap">Alerts</span>
-            {unreadCount > 0 && (
-              <Badge
-                variant="secondary"
-                className="h-5 min-w-5 justify-center px-1.5 text-xs"
-              >
-                {unreadCount}
-              </Badge>
-            )}
-          </Link>
-        )}
-
-        {/* History */}
-        {collapsed ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Link
-                href="/history"
-                className={cn(
-                  "flex items-center justify-center rounded-md py-2 text-sm font-medium transition-colors",
-                  pathname.startsWith("/history")
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
-                )}
-              >
-                <History className="h-4 w-4 shrink-0" />
-              </Link>
-            </TooltipTrigger>
-            <TooltipContent side="right">History</TooltipContent>
-          </Tooltip>
-        ) : (
-          <Link
-            href="/history"
-            className={cn(
-              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-              pathname.startsWith("/history")
-                ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
-            )}
-          >
-            <History className="h-4 w-4" />
-            <span className="whitespace-nowrap">History</span>
-          </Link>
-        )}
       </nav>
 
       {/* Footer */}

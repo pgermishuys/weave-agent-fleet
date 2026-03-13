@@ -10,7 +10,6 @@ import {
   getSessionsForInstance,
   getAnySessionForInstance,
   deleteSession,
-  deleteNotificationsForSession,
   deleteCallbacksForSession,
   getSessionsForWorkspace,
 } from "@/lib/server/db-repository";
@@ -362,7 +361,7 @@ export async function DELETE(
   }
 
   // ── Permanent delete ─────────────────────────────────────────────────────────
-  // Step 5: Delete related notifications
+  // Step 5: Delete related callbacks
   if (resolvedDbId) {
     // Stop server-side callback monitoring before deleting callback rows
     try {
@@ -371,13 +370,6 @@ export async function DELETE(
       // Non-fatal
     }
 
-    try {
-      deleteNotificationsForSession(resolvedDbId);
-    } catch (err) {
-      console.warn(`[DELETE /api/sessions/${sessionId}] Notification cleanup failed:`, err);
-    }
-
-    // Step 5.5: Delete related callbacks
     try {
       deleteCallbacksForSession(resolvedDbId);
     } catch (err) {

@@ -25,7 +25,6 @@ vi.mock("@/lib/server/db-repository", () => ({
   getSessionsForInstance: vi.fn(() => []),
   getAnySessionForInstance: vi.fn(),
   deleteSession: vi.fn(),
-  deleteNotificationsForSession: vi.fn(),
   deleteCallbacksForSession: vi.fn(),
   getSessionsForWorkspace: vi.fn(() => []),
 }));

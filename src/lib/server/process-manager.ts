@@ -28,9 +28,6 @@ import {
   updateSessionStatus,
   listWorkspaceRoots,
 } from "./db-repository";
-import {
-  createSessionDisconnectedNotification,
-} from "./notification-service";
 import { ensureWatching, stopWatching } from "./session-status-watcher";
 import { log } from "./logger";
 import { getMergedConfig } from "./config-manager";
@@ -582,12 +579,6 @@ export function destroyInstance(id: string): void {
     const activeSessions = getSessionsForInstance(id);
     for (const session of activeSessions) {
       updateSessionStatus(session.id, "disconnected", new Date().toISOString());
-      createSessionDisconnectedNotification(
-        session.opencode_session_id,
-        id,
-        session.title,
-        { reason: "instance destroyed", directory: instance.directory }
-      );
     }
   } catch (err) {
     log.warn("process-manager", "Failed to cascade session disconnections on instance destroy", { instanceId: id, err });
@@ -761,19 +752,11 @@ export function startHealthCheckLoop(): void {
             log.warn("process-manager", "Failed to mark dead instance as stopped in DB", { instanceId: id, err });
           }
 
-          // Create disconnected notifications for all active sessions on this instance
-          // and mark them as disconnected in the DB
           let activeSessions: ReturnType<typeof getSessionsForInstance> = [];
           try {
             activeSessions = getSessionsForInstance(id);
             for (const session of activeSessions) {
               updateSessionStatus(session.id, "disconnected", new Date().toISOString());
-              createSessionDisconnectedNotification(
-                session.opencode_session_id,
-                id,
-                session.title,
-                { reason: `health check failed ${fails} times (TCP + HTTP last-chance)`, directory: instance.directory }
-              );
             }
           } catch (err) {
             log.warn("process-manager", "Failed to cascade session disconnections after health check failure", { instanceId: id, err });
@@ -804,8 +787,6 @@ _recoveryComplete.then(() => {
   startHealthCheckLoop();
   // Ensure callback monitor is loaded — its self-initializing code starts the polling loop
   import("./callback-monitor").catch((err) => { log.warn("process-manager", "Failed to load callback monitor", { err }); });
-  // Start notification cleanup (TTL-based auto-deletion)
-  import("./notification-cleanup").then((m) => m.startNotificationCleanup()).catch((err) => { log.warn("process-manager", "Failed to start notification cleanup", { err }); });
 }).catch((err) => { log.warn("process-manager", "Post-recovery startup tasks failed", { err }); });
 
 // Clean up all instances when the Node.js process exits.

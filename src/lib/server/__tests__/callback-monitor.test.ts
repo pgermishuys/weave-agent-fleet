@@ -28,11 +28,6 @@ vi.mock("@/lib/server/callback-service", () => ({
   fireSessionErrorCallbacks: vi.fn(),
 }));
 
-// Mock notification-service
-vi.mock("@/lib/server/notification-service", () => ({
-  createSessionCompletedNotification: vi.fn(),
-}));
-
 // Mock db-repository — provide no-op implementations for functions used by the module
 vi.mock("@/lib/server/db-repository", () => ({
   getAllPendingCallbacks: vi.fn(() => []),

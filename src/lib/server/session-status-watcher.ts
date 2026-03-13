@@ -29,7 +29,7 @@ import {
 import type { DbSession } from "./db-repository";
 import { getInstance } from "./process-manager";
 import { getClientForInstance } from "./opencode-client";
-import { emitActivityStatus } from "./notification-emitter";
+import { emitActivityStatus } from "./activity-emitter";
 import { log } from "./logger";
 
 // ─── Types ────────────────────────────────────────────────────────────────────

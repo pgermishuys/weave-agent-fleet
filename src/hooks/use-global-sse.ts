@@ -29,7 +29,7 @@ export interface SSESubscription {
 
 // ─── Module-level singleton state ───────────────────────────────────────────
 
-const SSE_URL = sseUrl("/api/notifications/stream");
+const SSE_URL = sseUrl("/api/activity-stream");
 const BASE_DELAY = 1000;
 const MAX_DELAY = 30_000;
 
