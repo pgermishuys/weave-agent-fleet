@@ -28,6 +28,7 @@ import { TodoSidebarPanel } from "@/components/session/todo-sidebar-panel";
 import { DiffViewer } from "@/components/session/diff-viewer";
 import { useCommandRegistry } from "@/contexts/command-registry-context";
 import { useKeybindings } from "@/contexts/keybindings-context";
+import { useSessionsContext } from "@/contexts/sessions-context";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import type { SelectedModel } from "@/components/session/model-selector";
 import Link from "next/link";
@@ -54,6 +55,14 @@ export default function SessionDetailPage() {
 
   const sessionId = params.id as string;
   const instanceId = searchParams.get("instanceId") ?? "";
+
+  // Subscribe to sessions context so optimistic title patches (from rename)
+  // are reflected immediately on the detail page header.
+  const { sessions: contextSessions } = useSessionsContext();
+  const contextTitle = useMemo(() => {
+    const match = contextSessions.find((s) => s.session.id === sessionId);
+    return match?.session.title;
+  }, [contextSessions, sessionId]);
 
   const { sendPrompt, isSending, error: sendError } = useSendPrompt();
   const { agents } = useAgents(instanceId);
@@ -154,14 +163,14 @@ export default function SessionDetailPage() {
         }
         return r.json();
       })
-      .then((data: { workspaceId?: string; workspaceDirectory?: string; isolationStrategy?: string; session?: { title?: string; time?: { created?: number } }; ancestors?: AncestorInfo[] } | null) => {
+      .then((data: { workspaceId?: string; workspaceDirectory?: string; isolationStrategy?: string; session?: { title?: string; time?: { created?: number } }; ancestors?: AncestorInfo[]; dbTitle?: string } | null) => {
         if (!data) return;
         metadataFetchedRef.current = true;
         setMetadata({
           workspaceId: data.workspaceId ?? null,
           workspaceDirectory: data.workspaceDirectory ?? null,
           isolationStrategy: data.isolationStrategy ?? null,
-          title: data.session?.title,
+          title: data.dbTitle ?? data.session?.title,
           createdAt: data.session?.time?.created,
           ancestors: data.ancestors,
         });
@@ -323,8 +332,7 @@ export default function SessionDetailPage() {
   return (
     <div className="flex flex-col h-full">
       <Header
-        title={sessionId}
-        subtitle={instanceId ? `Instance: ${instanceId.slice(0, 8)}…` : undefined}
+        title={contextTitle || metadata.title || sessionId.slice(0, 12)}
         actions={
           <div className="flex items-center gap-2">
             <span

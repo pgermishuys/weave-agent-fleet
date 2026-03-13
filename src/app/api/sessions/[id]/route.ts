@@ -157,12 +157,14 @@ export async function GET(
     let workspaceDirectory: string | null = null;
     let isolationStrategy: string | null = null;
     let branch: string | null = null;
+    let dbTitle: string | null = null;
     const ancestors: AncestorInfo[] = [];
 
     try {
       const dbSession = getSession(sessionId) ?? getSessionByOpencodeId(sessionId);
       if (dbSession) {
         workspaceId = dbSession.workspace_id;
+        dbTitle = dbSession.title ?? null;
         const ws = getWorkspace(dbSession.workspace_id);
         if (ws) {
           workspaceDirectory = ws.directory;
@@ -226,6 +228,7 @@ export async function GET(
         isolationStrategy,
         branch,
         ancestors,
+        dbTitle,
       },
       { status: 200 }
     );

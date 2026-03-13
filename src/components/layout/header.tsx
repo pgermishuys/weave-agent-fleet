@@ -16,7 +16,7 @@ export function Header({ title, subtitle, actions }: HeaderProps) {
   return (
     <header className="flex h-14 items-center justify-between border-b border-border px-6">
       <div>
-        <h2 className="text-lg font-semibold font-mono">{title}</h2>
+        <h2 className="text-lg font-semibold">{title}</h2>
         {subtitle && (
           <p className="text-xs text-muted-foreground">{subtitle}</p>
         )}
