@@ -253,7 +253,29 @@ Weave Agent Fleet is currently a monolithic Next.js app — UI and API run toget
   - **Single-tenant design note**: The server does not know about other fleet servers. CORS is purely about which *client* origins are allowed to call *this* server. This is the correct scoping — configurable per server, not globally federated.
   - Update `src/cli/index.ts` / `printUsage()` to document `FLEET_ALLOWED_ORIGINS` under Serve Options
 
-- [ ] **11. Manual end-to-end verification**
+- [ ] **11. Inject `window.__FLEET_TOKEN__` into served HTML (monolithic mode)**
+  - When the server starts in monolithic mode (UI + API in one process), inject the plaintext token into the HTML page so the browser UI can authenticate without any user action
+  - **Where**: the Next.js app's root HTML response. The correct place is `src/app/layout.tsx` — add a `<script>` tag in `<head>` that sets `window.__FLEET_TOKEN__` using a server-side env var
+  - **Mechanism**: at startup (in `src/cli/serve.ts` or the launcher), write the plaintext token to a `FLEET_INJECT_TOKEN` env var before spawning the Next.js process. The layout reads `process.env.FLEET_INJECT_TOKEN` server-side and injects it:
+    ```tsx
+    // src/app/layout.tsx — inside <head>, server-rendered
+    {process.env.FLEET_INJECT_TOKEN && (
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `window.__FLEET_TOKEN__=${JSON.stringify(process.env.FLEET_INJECT_TOKEN)};`,
+        }}
+      />
+    )}
+    ```
+  - `FLEET_INJECT_TOKEN` is set only when running in monolithic mode (`weave-fleet` binary). It is **not** set in `weave-fleet serve` (standalone API-only mode) — remote users receive no injected token and must register via the Add Server dialog
+  - `FLEET_AUTH_DISABLED=true` (dev mode): no token exists, nothing to inject — the condition is naturally false
+  - The injected token lives in page memory only — the UI reads `window.__FLEET_TOKEN__` and never writes it to localStorage
+  - **Acceptance**:
+    - `weave-fleet` (monolithic): open browser, open DevTools console, `window.__FLEET_TOKEN__` is a non-empty string; API calls from the UI succeed without manual auth setup
+    - `weave-fleet serve` (API-only): `window.__FLEET_TOKEN__` is `undefined` in the browser
+    - `npm run dev`: `window.__FLEET_TOKEN__` is `undefined`; dev mode still works via `FLEET_AUTH_DISABLED`
+
+- [ ] **12. Manual end-to-end verification**
   - Build the CLI: `npm run build:cli`
   - Run `node cli.js serve` — verify token is printed on first start
   - Run `node cli.js serve` again — verify token is NOT printed, server starts silently
@@ -265,6 +287,8 @@ Weave Agent Fleet is currently a monolithic Next.js app — UI and API run toget
   - Call `curl -H "Authorization: Bearer <token>" http://localhost:3000/api/fleet/identity` — verify correct name, version, capabilities returned
   - Start with `FLEET_NAME="my-server"` env var set — verify identity endpoint returns `"name": "my-server"`
   - Verify CORS: with `FLEET_ALLOWED_ORIGINS` unset, cross-origin requests are allowed; with it set to a specific origin, non-matching origins are blocked
+  - Run `weave-fleet` (monolithic mode) — open browser, check `window.__FLEET_TOKEN__` in DevTools console — expect a non-empty string; verify UI API calls succeed without manual auth
+  - Run `weave-fleet serve` (standalone) — check `window.__FLEET_TOKEN__` — expect `undefined`
 
 ---
 
