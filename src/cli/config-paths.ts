@@ -67,3 +67,11 @@ export function getDataDir(): string {
 export function getAuthJsonPath(): string {
   return join(getDataDir(), "auth.json");
 }
+
+/**
+ * Returns the path to the Fleet API token hash file.
+ * Stored at ~/.weave/api-token.hash — same directory as fleet.db.
+ */
+export function getTokenHashPath(): string {
+  return join(homedir(), ".weave", "api-token.hash");
+}

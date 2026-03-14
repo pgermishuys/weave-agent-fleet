@@ -42,6 +42,13 @@ export default function RootLayout({
     <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=JSON.parse(localStorage.getItem('weave-theme'));var h=document.documentElement;if(t==='black'){h.classList.add('dark','theme-black');}else if(t==='light'){h.classList.remove('dark');h.classList.add('theme-light');}else{h.classList.add('dark');}}catch(e){}})();` }} />
+        {process.env.FLEET_INJECT_TOKEN && (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `window.__FLEET_TOKEN__=${JSON.stringify(process.env.FLEET_INJECT_TOKEN)};`,
+            }}
+          />
+        )}
       </head>
       <body
         className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}
