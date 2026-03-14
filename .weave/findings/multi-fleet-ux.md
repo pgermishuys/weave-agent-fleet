@@ -223,7 +223,37 @@ The only genuinely new component is the status dot with tooltip. Everything else
 ## What Does Not Change for Single-Server Users
 
 - No tab row visible
-- Fleet header looks the same (static, or subtly shows Local identity)
-- New Session dialog unchanged
-- Overview page unchanged
+- Fleet header label stays as **"Fleet"** — only switches to showing the server name once a second server is registered. The `···` menu is the only new addition; for Local it contains only "Add Fleet Server".
+- New Session dialog unchanged — no server selector shown
+- Overview page unchanged — no filter pills shown
 - Zero new UI surface until a second server is registered
+
+---
+
+## Local Token Injection (Monolithic Mode)
+
+**The problem**: all API endpoints are now protected by bearer token auth (see `serve-command.md`). For a remote user this is fine — they register the server with their token via the Add Server dialog. But for a local user running the default monolithic mode (UI + API in one process), requiring them to manually authenticate against their own local server would be absurd friction.
+
+**The solution: token injection via server-rendered HTML (Option C)**
+
+When the server starts in monolithic mode, it already knows the token — it generated or loaded it at startup. It injects the token directly into the initial HTML page response as a `window` global:
+
+```html
+<script>window.__FLEET_TOKEN__ = "abc123...";</script>
+```
+
+The UI reads `window.__FLEET_TOKEN__` on load and holds it in memory. `api-client.ts` includes it as a `Bearer` token on all API calls automatically. The token is never written to `localStorage` — it lives only in the page's memory for the lifetime of the tab.
+
+**Why this is safe**: the injected token is only present in HTML served by the local process itself. A remote user browsing to a Fleet server they've connected to would not receive a token via this mechanism — the server only injects the token when serving its own UI from the same process.
+
+**The result for the local user**: Fleet starts, browser opens, everything works exactly as today. The token injection is entirely invisible. No registration flow, no copy-paste, no setup.
+
+### Auth Mode Matrix
+
+| Mode | Auth behaviour |
+|------|---------------|
+| `npm run dev` | `FLEET_AUTH_DISABLED=true` — no auth, works as today |
+| `weave-fleet` (monolithic, local user) | Token injected into page HTML — transparent, no user action |
+| `weave-fleet serve` (remote server) | Token printed once at startup — user registers via Add Server dialog |
+
+All three cases work without friction for their intended audience.

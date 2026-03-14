@@ -283,3 +283,4 @@ Weave Agent Fleet is currently a monolithic Next.js app — UI and API run toget
 | `GET /api/fleet/identity` added | Enables clients to label connections correctly in multi-fleet UIs; server describes itself only |
 | `FLEET_NAME` / `FLEET_DESCRIPTION` env vars | User-configurable server identity without code changes; defaults are sensible |
 | `FLEET_ALLOWED_ORIGINS` for CORS | Wildcards are fine for dev; production operators can lock down to specific client origins per-server |
+| Local token injection via `window.__FLEET_TOKEN__` | In monolithic mode the server injects the token into the served HTML at startup — local users get zero-friction auth with no registration flow. Token lives in page memory only, never localStorage. Remote users receive no injected token and register via the Add Server dialog. See `.weave/findings/multi-fleet-ux.md` § Local Token Injection. |
