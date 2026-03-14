@@ -167,3 +167,135 @@ A clean `@weave-fleet/client` SDK means other tools can integrate: VS Code exten
 ## Summary
 
 The mental model shift: **Fleet Server is the engine, Fleet Client is the steering wheel.** You can have multiple steering wheels (web, CLI, desktop, API), and the engine can run anywhere — local machine, team server, or cloud. The existing API surface is ~90% of what's needed; the main gaps are auth, network binding, and a clean client extraction.
+
+---
+
+## Multi-Fleet: Connecting to Many Fleet Servers
+
+> Date: 2026-03-14
+> Status: Design Decision
+
+The 1:1 client→server model described above naturally extends to a **1:N model** — a single Fleet Client managing sessions across multiple Fleet Server instances simultaneously. This section captures the design decisions for that topology.
+
+### The Core Concept: Fleet Connection Registry
+
+The client maintains a **registry of named fleet connections**. Each entry is a discrete, credentialed endpoint:
+
+```
+Connection: "local"        → http://localhost:3000          (no auth / dev)
+Connection: "work-server"  → https://dev.company.com:3000   (API key A)
+Connection: "cloud-runner" → https://fleet.acme.io          (API key B)
+Connection: "team-shared"  → https://fleet.team.internal    (API key C)
+```
+
+Each connection record contains:
+- **name** — human-readable alias (e.g. `"work-server"`)
+- **url** — the base URL of the fleet server
+- **credentials** — API key or token, stored securely
+- **status** — `connected` / `disconnected` / `error` (runtime, not persisted)
+- **color/tag** (optional) — visual differentiation in the UI
+
+Persistence location by client type:
+| Client | Storage |
+|--------|---------|
+| Web UI | `localStorage` |
+| Tauri desktop | OS keychain / `~/.weave/connections.json` |
+| CLI | `~/.weave/connections.json` |
+| SDK | Caller-supplied config |
+
+Credentials must **never** be stored in plaintext. In `localStorage`, sensitive values should be omitted and re-prompted, or stored in an encrypted form.
+
+---
+
+### Client UX: Two Display Modes
+
+**Switched mode** — one active fleet at a time. A connection selector (dropdown or sidebar) determines which server all views are scoped to. Simpler cognitive model.
+
+**Unified mode** — all fleet servers shown in one view. Sessions from different servers are aggregated and tagged with a connection badge/color. This is the more powerful mode and the preferred direction — the fleet overview should be able to show sessions from 3 different servers side-by-side.
+
+Both modes can coexist: unified by default, with the ability to filter down to a single connection.
+
+---
+
+### Session Ownership and Routing
+
+Sessions belong permanently to the fleet server that created them. They cannot be migrated between servers. The client must always track which connection a session came from in order to route API calls correctly.
+
+**Client-side session namespacing**: when aggregating sessions across connections, the client should use a composite key `{connectionName}:{sessionId}` internally to prevent ID collisions. This is a client-side concern only — the server always receives bare session IDs.
+
+---
+
+### SSE Stream Multiplexing
+
+Each connected fleet server has its own SSE stream (`GET /api/activity-stream`, `GET /api/sessions/:id/events`). The client maintains one SSE connection per registered (and reachable) fleet server and fans the events into a unified event bus. The UI renders events tagged with their source connection.
+
+---
+
+### Connection Health Monitoring
+
+The client tracks liveness per connection:
+- Poll `GET /api/fleet/health` (or `GET /api/fleet/summary`) on a short interval per connection
+- On failure, mark the connection as `disconnected` and show last-known sessions as stale
+- Auto-reconnect with exponential backoff when a server comes back online
+- SSE reconnection is handled natively by the browser's `EventSource` API — the client should surface stream disconnect state in the UI
+
+---
+
+### Design Decisions: Server Stays Dumb
+
+**The fleet server is unaware of other fleet servers.** Multi-fleet topology is entirely a client-side concern. No federation, no server-to-server communication, no shared state between servers.
+
+Specific decisions:
+
+1. **No server-side federation** — each fleet server manages only its own sessions, processes, and database. It does not proxy to or know about other fleet servers.
+
+2. **API key per server** — each fleet server has its own independent credentials. There is no shared or cross-server auth. The client manages the mapping of connection → credentials.
+
+3. **Session IDs are server-scoped** — session IDs only need to be unique within a single server. Global uniqueness is the client's responsibility via namespacing (see above).
+
+4. **CORS must accept the client's actual origin** — in a multi-fleet setup, a web client served from one origin may connect to fleet servers on different domains. The server's `Access-Control-Allow-Origin` should be configurable to accept specific known client origins rather than defaulting to `*` in production.
+
+5. **Add `GET /api/fleet/identity`** — a lightweight endpoint the client calls immediately on connection to confirm server identity and display a meaningful name in the UI:
+   ```json
+   {
+     "name": "work-server",
+     "version": "1.2.0",
+     "description": "Team shared dev server",
+     "capabilities": ["worktree", "clone"]
+   }
+   ```
+   The `name` field should be user-configurable via server env var (`FLEET_NAME`). This is low-effort to implement and high-value for multi-fleet UX.
+
+---
+
+### Implications for the API Client (`api-client.ts`)
+
+The current plan moves `api-client.ts` from a build-time `NEXT_PUBLIC_API_BASE_URL` to a runtime-configurable base URL. In a multi-fleet world, this needs one further step: **the API client must accept a connection context per call**, not just a global singleton base URL.
+
+```typescript
+// Single-fleet (current direction): global base URL
+const client = new FleetApiClient("https://server-a.com", apiKeyA)
+
+// Multi-fleet (target direction): registry-aware client
+const registry = new FleetConnectionRegistry()
+registry.add({ name: "local",  url: "http://localhost:3000" })
+registry.add({ name: "work",   url: "https://dev.company.com", apiKey: "..." })
+registry.add({ name: "cloud",  url: "https://fleet.acme.io",   apiKey: "..." })
+
+// Each call is scoped to a specific connection
+await registry.get("work").sessions.list()
+await registry.get("local").sessions.create({ ... })
+```
+
+The `FleetConnectionRegistry` becomes the top-level client abstraction. Individual `FleetApiClient` instances are created per connection and managed by the registry.
+
+This does not change the server API at all — the server always sees normal HTTP requests. The registry complexity lives entirely in the client layer.
+
+---
+
+### What This Does NOT Require (Non-Goals)
+
+- **No cross-fleet session migration** — sessions cannot move between servers
+- **No cross-fleet callbacks** — a session on server A cannot trigger a callback that notifies a session on server B (callbacks are intra-server)
+- **No server mesh/federation** — servers do not communicate with each other
+- **No centralized auth server** — each fleet server authenticates independently; there is no OAuth/SSO layer required at this stage
