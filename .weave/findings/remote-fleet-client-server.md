@@ -299,3 +299,11 @@ This does not change the server API at all — the server always sees normal HTT
 - **No cross-fleet callbacks** — a session on server A cannot trigger a callback that notifies a session on server B (callbacks are intra-server)
 - **No server mesh/federation** — servers do not communicate with each other
 - **No centralized auth server** — each fleet server authenticates independently; there is no OAuth/SSO layer required at this stage
+
+---
+
+### UX Design
+
+The full UX and UI design for multi-fleet — sidebar layout, server tabs, registration flow, New Session server selector, credential storage, and connection health — is captured separately:
+
+→ `.weave/findings/multi-fleet-ux.md`
