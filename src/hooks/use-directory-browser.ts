@@ -33,8 +33,12 @@ export interface UseDirectoryBrowserResult {
  * Client-side hook for browsing directories via GET /api/directories.
  * Follows the useFindFiles pattern: useState + useEffect, AbortController
  * for cancellation, debounced search.
+ *
+ * @param enabled - Whether to start fetching (e.g. when a popover is open)
+ * @param connectionId - Optional connection id for multi-fleet support.
+ *   When omitted, uses the local/default Fleet Server.
  */
-export function useDirectoryBrowser(enabled = false): UseDirectoryBrowserResult {
+export function useDirectoryBrowser(enabled = false, connectionId?: string): UseDirectoryBrowserResult {
   const [currentPath, setCurrentPath] = useState<string | null>(null);
   const [entries, setEntries] = useState<DirectoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -69,7 +73,7 @@ export function useDirectoryBrowser(enabled = false): UseDirectoryBrowserResult 
 
         const url = `/api/directories${params.toString() ? `?${params.toString()}` : ""}`;
 
-        apiFetch(url, { signal: controller.signal })
+        apiFetch(url, { signal: controller.signal }, connectionId)
           .then(async (response) => {
             if (!response.ok) {
               const data = await response.json().catch(() => ({}));
@@ -108,7 +112,7 @@ export function useDirectoryBrowser(enabled = false): UseDirectoryBrowserResult 
       clearTimeout(timer);
       controller?.abort();
     };
-  }, [currentPath, search, fetchTrigger, enabled, hasActivated]);
+  }, [currentPath, search, fetchTrigger, enabled, hasActivated, connectionId]);
 
   const browse = useCallback((path: string | null) => {
     setHasActivated(true);

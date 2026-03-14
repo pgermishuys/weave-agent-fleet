@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -11,6 +11,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
+  MoreHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -18,6 +19,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useSessionsContext } from "@/contexts/sessions-context";
 import { useWorkspaces } from "@/hooks/use-workspaces";
 import {
@@ -30,6 +37,11 @@ import { useSidebarResize } from "@/hooks/use-sidebar-resize";
 import { SidebarWorkspaceItem } from "@/components/layout/sidebar-workspace-item";
 import { NewSessionDialog } from "@/components/session/new-session-dialog";
 import { useCurrentSessionDirectory } from "@/hooks/use-current-session-directory";
+import { useFleetConnections } from "@/hooks/use-fleet-connections";
+import { FleetServerTabs } from "@/components/layout/fleet-server-tabs";
+import { AddServerDialog } from "@/components/fleet/add-server-dialog";
+import { RemoveServerDialog } from "@/components/fleet/remove-server-dialog";
+import type { FleetConnection } from "@/lib/fleet-connection-registry";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -45,6 +57,32 @@ export function Sidebar() {
   } = useSidebar();
   const treeRef = useRef<HTMLDivElement>(null);
   const currentDirectory = useCurrentSessionDirectory();
+  const { connections, activeConnection } = useFleetConnections();
+
+  // Dialog state
+  const [addServerOpen, setAddServerOpen] = useState(false);
+  const [editConnection, setEditConnection] = useState<FleetConnection | undefined>();
+  const [removeServerOpen, setRemoveServerOpen] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState<FleetConnection | undefined>();
+
+  const handleAddServer = () => {
+    setEditConnection(undefined);
+    setAddServerOpen(true);
+  };
+
+  const handleEditServer = () => {
+    if (!activeConnection.isLocal) {
+      setEditConnection(activeConnection);
+      setAddServerOpen(true);
+    }
+  };
+
+  const handleRemoveServer = () => {
+    if (!activeConnection.isLocal) {
+      setRemoveTarget(activeConnection);
+      setRemoveServerOpen(true);
+    }
+  };
 
   const handleResizeStart = useCallback(() => {
     setIsResizing(true);
@@ -145,6 +183,7 @@ export function Sidebar() {
   );
 
   const isFleetActive = pathname === "/" || pathname.startsWith("/?");
+  const isMultiServer = connections.length >= 2;
 
   const sidebarWidth = collapsed ? SIDEBAR_COLLAPSED_WIDTH : width;
 
@@ -224,7 +263,7 @@ export function Sidebar() {
             </Tooltip>
           </>
         ) : (
-          /* Expanded: static Fleet heading + workspace tree */
+          /* Expanded: Fleet heading + server tabs + workspace tree */
           <>
             {/* Fleet header row */}
             <div
@@ -243,8 +282,27 @@ export function Sidebar() {
                 className="flex flex-1 items-center gap-1 min-w-0"
               >
                 <LayoutGrid className="h-4 w-4 shrink-0" />
-                <span className="flex-1 whitespace-nowrap">Fleet</span>
+                {isMultiServer ? (
+                  <span className="flex items-center gap-1 min-w-0">
+                    <span className="truncate">{activeConnection.name}</span>
+                    <span
+                      className={cn(
+                        "text-[10px] leading-none shrink-0",
+                        activeConnection.status === "online"
+                          ? "text-green-500"
+                          : activeConnection.status === "error"
+                          ? "text-red-500"
+                          : "text-muted-foreground"
+                      )}
+                    >
+                      ●
+                    </span>
+                  </span>
+                ) : (
+                  <span className="flex-1 whitespace-nowrap">Fleet</span>
+                )}
               </Link>
+
               {/* New Session button */}
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -263,7 +321,40 @@ export function Sidebar() {
                 </TooltipTrigger>
                 <TooltipContent side="right">New Session</TooltipContent>
               </Tooltip>
+
+              {/* ··· management menu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground transition-colors"
+                    aria-label="Manage fleet servers"
+                  >
+                    <MoreHorizontal className="h-3.5 w-3.5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="text-xs">
+                  <DropdownMenuItem onClick={handleAddServer} className="text-xs">
+                    Add Fleet Server
+                  </DropdownMenuItem>
+                  {!activeConnection.isLocal && (
+                    <>
+                      <DropdownMenuItem onClick={handleEditServer} className="text-xs">
+                        Edit &ldquo;{activeConnection.name}&rdquo;
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={handleRemoveServer}
+                        className="text-xs text-destructive focus:text-destructive"
+                      >
+                        Remove &ldquo;{activeConnection.name}&rdquo;
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
+
+            {/* Server tabs — rendered below Fleet header */}
+            <FleetServerTabs onAddServerClick={handleAddServer} />
 
             {/* Workspace tree */}
             <div
@@ -404,6 +495,28 @@ export function Sidebar() {
             )}
           />
         </div>
+      )}
+
+      {/* Add / Edit Server dialog */}
+      <AddServerDialog
+        open={addServerOpen}
+        onOpenChange={(open) => {
+          setAddServerOpen(open);
+          if (!open) setEditConnection(undefined);
+        }}
+        editConnection={editConnection}
+      />
+
+      {/* Remove Server dialog */}
+      {removeTarget && (
+        <RemoveServerDialog
+          open={removeServerOpen}
+          onOpenChange={(open) => {
+            setRemoveServerOpen(open);
+            if (!open) setRemoveTarget(undefined);
+          }}
+          connection={removeTarget}
+        />
       )}
     </aside>
   );

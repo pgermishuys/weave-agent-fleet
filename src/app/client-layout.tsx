@@ -12,8 +12,12 @@ import { ViewCommands } from "@/components/commands/view-commands";
 import { SessionCommands } from "@/components/commands/session-commands";
 import { CommandPalette } from "@/components/command-palette";
 import { TauriUpdateDialog } from "@/components/tauri-update-dialog";
+import { FleetConnectionProvider } from "@/contexts/fleet-connection-context";
+import { useConnectionHealth } from "@/hooks/use-connection-health";
 
-export function ClientLayout({ children }: { children: React.ReactNode }) {
+/** Inner component so we can call hooks that require FleetConnectionProvider */
+function AppRoot({ children }: { children: React.ReactNode }) {
+  useConnectionHealth();
   return (
     <ThemeProvider>
       <SessionsProvider>
@@ -36,5 +40,13 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
         </SidebarProvider>
       </SessionsProvider>
     </ThemeProvider>
+  );
+}
+
+export function ClientLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <FleetConnectionProvider>
+      <AppRoot>{children}</AppRoot>
+    </FleetConnectionProvider>
   );
 }
