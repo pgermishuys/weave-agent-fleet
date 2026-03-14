@@ -24,6 +24,7 @@ import { ConfirmDeleteSessionDialog } from "@/components/fleet/confirm-delete-se
 import type { FleetSummary } from "@/lib/types";
 import type { SessionListItem } from "@/lib/api-types";
 import { Loader2 } from "lucide-react";
+import { useFleetConnections } from "@/hooks/use-fleet-connections";
 
 function FleetPageInner() {
   const { sessions, isLoading, error, refetch, summary: liveSummary } = useSessionsContext();
@@ -49,6 +50,8 @@ function FleetPageInner() {
     { groupBy: "directory", sortBy: "recent" }
   );
   const [search, setSearch] = useState("");
+  const [activeServerFilter, setActiveServerFilter] = useState<string | "all">("all");
+  const { connections } = useFleetConnections();
 
   const handleGroupByChange = useCallback((groupBy: GroupBy) => {
     setPrefs((prev) => ({ ...prev, groupBy }));
@@ -119,17 +122,36 @@ function FleetPageInner() {
     [sessions, workspaceFilter]
   );
 
+  // Apply server filter — sessions without a connectionId are treated as "local"
+  const serverFiltered = useMemo(() => {
+    if (activeServerFilter === "all") return workspaceFiltered;
+    return workspaceFiltered.filter((s) => {
+      const connId = (s as SessionListItem & { connectionId?: string }).connectionId ?? "local";
+      return connId === activeServerFilter;
+    });
+  }, [workspaceFiltered, activeServerFilter]);
+
   // Apply search filter
   const searchFiltered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return workspaceFiltered;
-    return workspaceFiltered.filter((s) => {
+    if (!q) return serverFiltered;
+    return serverFiltered.filter((s) => {
       const title = s.session.title?.toLowerCase() ?? "";
       const dir = (s.sourceDirectory ?? s.workspaceDirectory).toLowerCase();
       const displayName = s.workspaceDisplayName?.toLowerCase() ?? "";
       return title.includes(q) || dir.includes(q) || displayName.includes(q);
     });
-  }, [workspaceFiltered, search]);
+  }, [serverFiltered, search]);
+
+  // Compute session counts per connection for filter pills
+  const sessionCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const s of workspaceFiltered) {
+      const connId = (s as SessionListItem & { connectionId?: string }).connectionId ?? "local";
+      counts[connId] = (counts[connId] ?? 0) + 1;
+    }
+    return counts;
+  }, [workspaceFiltered]);
 
   // Apply sort within session arrays
   const sortSessions = useCallback((items: SessionListItem[]): SessionListItem[] => {
@@ -474,6 +496,9 @@ function FleetPageInner() {
           onGroupByChange={handleGroupByChange}
           onSortByChange={handleSortByChange}
           onSearchChange={setSearch}
+          activeServerFilter={activeServerFilter}
+          onServerFilterChange={setActiveServerFilter}
+          sessionCounts={sessionCounts}
         />
 
         {isLoading && sessions.length === 0 && (

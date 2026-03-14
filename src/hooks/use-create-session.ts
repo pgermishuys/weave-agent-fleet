@@ -13,7 +13,8 @@ export interface CreateSessionOptions {
 export interface UseCreateSessionResult {
   createSession: (
     directory: string,
-    opts?: CreateSessionOptions
+    opts?: CreateSessionOptions,
+    connectionId?: string
   ) => Promise<CreateSessionResponse>;
   isLoading: boolean;
   error?: string;
@@ -24,7 +25,7 @@ export function useCreateSession(): UseCreateSessionResult {
   const [error, setError] = useState<string | undefined>();
 
   const createSession = useCallback(
-    async (directory: string, opts?: CreateSessionOptions): Promise<CreateSessionResponse> => {
+    async (directory: string, opts?: CreateSessionOptions, connectionId?: string): Promise<CreateSessionResponse> => {
       setIsLoading(true);
       setError(undefined);
       try {
@@ -39,7 +40,7 @@ export function useCreateSession(): UseCreateSessionResult {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
-        });
+        }, connectionId);
 
         if (!response.ok) {
           const data = await response.json().catch(() => ({}));

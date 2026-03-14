@@ -12,9 +12,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Loader2, AlertCircle, FolderOpen, GitBranch, Copy } from "lucide-react";
 import { useCreateSession } from "@/hooks/use-create-session";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { useFleetConnections } from "@/hooks/use-fleet-connections";
 import type { ReactNode } from "react";
 
 type IsolationStrategy = "existing" | "worktree" | "clone";
@@ -70,6 +78,17 @@ export function NewSessionDialog({ trigger, open: controlledOpen, onOpenChange, 
   const [directory, setDirectory] = usePersistedState("weave:new-session:lastDirectory", "");
 
   const open = controlledOpen ?? internalOpen;
+
+  const { connections, activeConnection } = useFleetConnections();
+  const isMultiServer = connections.length >= 2;
+  const [selectedConnectionId, setSelectedConnectionId] = useState<string>(activeConnection.id);
+
+  // Sync selected connection to active connection when dialog opens
+  useEffect(() => {
+    if (open) {
+      setSelectedConnectionId(activeConnection.id);
+    }
+  }, [open, activeConnection.id]);
 
   // When the dialog opens with a defaultDirectory, pre-fill the directory field.
   // This must live in an effect — calling setDirectory during render triggers
@@ -149,12 +168,18 @@ export function NewSessionDialog({ trigger, open: controlledOpen, onOpenChange, 
     e.preventDefault();
     if (!directory.trim() || isLoading) return;
 
+    const connectionId = isMultiServer ? selectedConnectionId : undefined;
+
     try {
-      const { instanceId, session } = await createSession(directory.trim(), {
-        title: title.trim() || undefined,
-        isolationStrategy,
-        branch: isolationStrategy === "worktree" && branch.trim() ? branch.trim() : undefined,
-      });
+      const { instanceId, session } = await createSession(
+        directory.trim(),
+        {
+          title: title.trim() || undefined,
+          isolationStrategy,
+          branch: isolationStrategy === "worktree" && branch.trim() ? branch.trim() : undefined,
+        },
+        connectionId
+      );
       setOpen(false);
       router.push(
         `/sessions/${encodeURIComponent(session.id)}?instanceId=${encodeURIComponent(instanceId)}`
@@ -173,6 +198,33 @@ export function NewSessionDialog({ trigger, open: controlledOpen, onOpenChange, 
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Server selector — shown only when 2+ connections */}
+          {isMultiServer && (
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium" htmlFor="fleet-server">
+                Fleet Server
+              </label>
+              <Select
+                value={selectedConnectionId}
+                onValueChange={(id) => {
+                  setSelectedConnectionId(id);
+                  setDirectory("");
+                }}
+              >
+                <SelectTrigger id="fleet-server" className="h-9 text-sm">
+                  <SelectValue placeholder="Select server…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {connections.map((conn) => (
+                    <SelectItem key={conn.id} value={conn.id} className="text-sm">
+                      {conn.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* Isolation Strategy — roving tabindex: single tab stop, arrow keys to switch */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium" id="isolation-strategy-label">
@@ -224,6 +276,7 @@ export function NewSessionDialog({ trigger, open: controlledOpen, onOpenChange, 
               onChange={setDirectory}
               placeholder={DIRECTORY_PLACEHOLDERS[isolationStrategy]}
               disabled={isLoading}
+              connectionId={isMultiServer ? selectedConnectionId : undefined}
             />
           </div>
 

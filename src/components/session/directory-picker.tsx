@@ -39,6 +39,8 @@ interface DirectoryPickerProps {
   disabled?: boolean;
   /** HTML id for the text input (for label association) */
   id?: string;
+  /** Optional connection id for multi-fleet support. Omit for local behaviour. */
+  connectionId?: string;
 }
 
 export function DirectoryPicker({
@@ -47,6 +49,7 @@ export function DirectoryPicker({
   placeholder,
   disabled,
   id,
+  connectionId,
 }: DirectoryPickerProps) {
   const [popoverOpen, setPopoverOpen] = useState(false);
   const {
@@ -60,7 +63,7 @@ export function DirectoryPicker({
     goUp,
     search,
     setSearch,
-  } = useDirectoryBrowser(popoverOpen);
+  } = useDirectoryBrowser(popoverOpen, connectionId);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const commandListRef = useRef<HTMLDivElement>(null);
 

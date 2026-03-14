@@ -1,6 +1,6 @@
 # Plan: Multi-Fleet UI
 
-> Status: Ready for execution
+> Status: Completed
 > Scope: Client-side UI for connecting to, switching between, and managing multiple Fleet Server instances. No server-side work — UI only.
 
 ---
@@ -18,7 +18,7 @@
 
 ## Phase 1 — Connection Registry (foundation)
 
-- [ ] **1. Create `src/lib/fleet-connection-registry.ts`**
+- [x] **1. Create `src/lib/fleet-connection-registry.ts`**
   - Define the `FleetConnection` type:
     ```ts
     export type ConnectionStatus = "online" | "offline" | "connecting" | "error";
@@ -46,7 +46,7 @@
   - Export a singleton: `export const connectionRegistry = new FleetConnectionRegistry()`
   - **Acceptance**: TypeScript compiles; Local connection always present in `getConnections()`; `window.__FLEET_TOKEN__` is read fresh on every `getTokenForConnection("local")` call and never written to localStorage
 
-- [ ] **2. Create `src/contexts/fleet-connection-context.tsx`**
+- [x] **2. Create `src/contexts/fleet-connection-context.tsx`**
   - `"use client"` context wrapping `connectionRegistry`
   - Exposes via context value:
     ```ts
@@ -63,7 +63,7 @@
   - Mount in `src/app/client-layout.tsx`: wrap the existing provider tree with `<FleetConnectionProvider>` as the outermost provider (outside `ThemeProvider` is fine, but inside is also fine — just outermost of the Weave providers)
   - **Acceptance**: `npm run typecheck` passes; context available anywhere in the tree
 
-- [ ] **3. Create `src/hooks/use-fleet-connections.ts`**
+- [x] **3. Create `src/hooks/use-fleet-connections.ts`**
   - Thin hook: `export function useFleetConnections(): FleetConnectionContextValue { return useContext(FleetConnectionContext); }`
   - **Acceptance**: Compiles; returns the full context value
 
@@ -71,7 +71,7 @@
 
 ## Phase 2 — Connection-Aware API Client
 
-- [ ] **4. Evolve `src/lib/api-client.ts`**
+- [x] **4. Evolve `src/lib/api-client.ts`**
   - Add optional `connectionId` parameter to `apiFetch` and `apiUrl`:
     ```ts
     export function apiUrl(path: string, connectionId?: string): string
@@ -83,13 +83,13 @@
   - The `connectionRegistry` singleton is imported directly (no React context needed here — this is a plain module)
   - **Acceptance**: `npm run typecheck` passes; existing callers that omit `connectionId` behave identically to today; a call with a remote `connectionId` uses the correct base URL and auth header
 
-- [ ] **5. Add `connectionId` param to `src/hooks/use-directory-browser.ts`**
+- [x] **5. Add `connectionId` param to `src/hooks/use-directory-browser.ts`**
   - Add optional `connectionId?: string` to the hook's params
   - Pass it through to the `apiFetch` call: `apiFetch(url, { signal: controller.signal }, connectionId)`
   - Default: `undefined` (Local, existing behaviour)
   - **Acceptance**: `npm run typecheck` passes; existing callers unchanged
 
-- [ ] **6. Add `connectionId` prop to `src/components/session/directory-picker.tsx`**
+- [x] **6. Add `connectionId` prop to `src/components/session/directory-picker.tsx`**
   - Add optional `connectionId?: string` to `DirectoryPickerProps`
   - Pass it to `useDirectoryBrowser(popoverOpen, connectionId)`
   - Default: `undefined`
@@ -99,7 +99,7 @@
 
 ## Phase 3 — Connection Health
 
-- [ ] **7. Create `src/hooks/use-fleet-identity.ts`**
+- [x] **7. Create `src/hooks/use-fleet-identity.ts`**
   - Fetches `GET /api/fleet/identity` for a given connection:
     ```ts
     export interface FleetIdentity {
@@ -118,7 +118,7 @@
   - Fetches once on mount; re-fetches when `connectionId` changes
   - **Acceptance**: `npm run typecheck` passes; returns `null` while loading or on error
 
-- [ ] **8. Create `src/hooks/use-connection-health.ts`**
+- [x] **8. Create `src/hooks/use-connection-health.ts`**
   - Polls `GET /api/fleet/identity` per connection on a 30-second interval
   - On success: calls `connectionRegistry.setConnectionStatus(id, "online")` and triggers a React re-render via a counter state
   - On failure: calls `connectionRegistry.setConnectionStatus(id, "offline")` (or `"error"` for 401)
@@ -131,7 +131,7 @@
 
 ## Phase 4 — Sidebar: Fleet Header + Server Tabs
 
-- [ ] **9. Create `src/components/layout/fleet-server-tabs.tsx`**
+- [x] **9. Create `src/components/layout/fleet-server-tabs.tsx`**
   - Renders a horizontal tab row, one tab per connection
   - Tabs use existing sidebar nav styling (match the `isFleetActive` active/inactive classes from `sidebar.tsx`)
   - Local tab gets a small `Home` icon (lucide `Home` or `Monitor`) to distinguish it visually
@@ -146,7 +146,7 @@
     The ghost tab is a dashed-border button that opens the Add Server dialog. Disappears once 2+ real connections exist.
   - **Acceptance**: Tab row hidden for single-server users; appears immediately when a second connection is added; clicking a tab updates `activeConnection`
 
-- [ ] **10. Modify `src/components/layout/sidebar.tsx` — Fleet header promotion**
+- [x] **10. Modify `src/components/layout/sidebar.tsx` — Fleet header promotion**
   - Import `useFleetConnections` and `MoreHorizontal` (lucide) and `DropdownMenu` components
   - In the expanded Fleet header row (lines 229–266), replace the static `"Fleet"` label with dynamic content:
     - **Single server** (`connections.length < 2`): keep label `"Fleet"` — zero visible change for existing users. Show `···` menu containing only "Add Fleet Server".
@@ -163,7 +163,7 @@
 
 ## Phase 5 — Add / Edit / Remove Server Dialogs
 
-- [ ] **11. Create `src/components/fleet/add-server-dialog.tsx`**
+- [x] **11. Create `src/components/fleet/add-server-dialog.tsx`**
   - Modal dialog following the `install-skill-dialog.tsx` pattern (Dialog + DialogHeader + DialogFooter, loading/error/success states)
   - Props: `open: boolean`, `onOpenChange: (open: boolean) => void`, `editConnection?: FleetConnection` (if provided, dialog is in edit mode, pre-filled)
   - Fields:
@@ -181,7 +181,7 @@
   - Cancel button resets state and closes
   - **Acceptance**: Dialog validates connection before saving; inline error messages match spec; new connection appears as a sidebar tab immediately after save
 
-- [ ] **12. Create `src/components/fleet/remove-server-dialog.tsx`**
+- [x] **12. Create `src/components/fleet/remove-server-dialog.tsx`**
   - Uses existing `AlertDialog` component (`src/components/ui/alert-dialog.tsx`)
   - Props: `open: boolean`, `onOpenChange: (open: boolean) => void`, `connection: FleetConnection`
   - Message: *"Remove {connection.name}? Any sessions on this server will no longer be visible."*
@@ -193,7 +193,7 @@
 
 ## Phase 6 — New Session Dialog: Server Selector
 
-- [ ] **13. Modify `src/components/session/new-session-dialog.tsx`**
+- [x] **13. Modify `src/components/session/new-session-dialog.tsx`**
   - Import `useFleetConnections` and `Select` component (check existing usage in the codebase, or use a `<select>` element styled to match if no shadcn Select is present)
   - Add state: `const [selectedConnectionId, setSelectedConnectionId] = useState<string>(activeConnection.id)`
   - When dialog opens: default `selectedConnectionId` to `activeConnection.id`
@@ -215,7 +215,7 @@
 
 ## Phase 7 — Overview Page: Server Filter Pills
 
-- [ ] **14. Modify `src/components/fleet/fleet-toolbar.tsx`**
+- [x] **14. Modify `src/components/fleet/fleet-toolbar.tsx`**
   - Import `useFleetConnections`
   - Add `activeServerFilter: string | "all"` and `onServerFilterChange: (id: string | "all") => void` to `FleetToolbarProps`
   - **Show filter pills only when `connections.length >= 2`** — single-server users see no change
@@ -229,7 +229,7 @@
   - The parent page (fleet overview) is responsible for filtering the session list based on `activeServerFilter`
   - **Acceptance**: Pills hidden for single-server users; clicking a pill filters sessions to that server; "All Servers" shows all
 
-- [ ] **15. Wire server filter in the fleet overview page**
+- [x] **15. Wire server filter in the fleet overview page**
   - Find the fleet overview page (likely `src/app/page.tsx` or `src/components/fleet/fleet-page.tsx`) — read the file to confirm
   - Add `activeServerFilter` state: `useState<string | "all">("all")`
   - Pass `activeServerFilter` and `onServerFilterChange` to `<FleetToolbar />`
@@ -241,7 +241,7 @@
 
 ## Verification
 
-- [ ] **16. Type-check and lint**
+- [x] **16. Type-check and lint**
   - Run `npm run typecheck` — must pass with zero errors
   - Run `npm run lint` — must pass
 
@@ -282,7 +282,7 @@
 | `src/components/layout/sidebar.tsx` | Promote Fleet header with live server name + `···` menu; render `<FleetServerTabs />` |
 | `src/components/fleet/fleet-toolbar.tsx` | Add server filter pills (shown only when 2+ connections) |
 | `src/app/client-layout.tsx` | Wrap provider tree with `<FleetConnectionProvider>` |
-| Fleet overview page (TBD — confirm path) | Wire `activeServerFilter` state + session filtering |
+| `src/app/page.tsx` | Wire `activeServerFilter` state + session filtering |
 
 ---
 
