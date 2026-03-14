@@ -8,6 +8,7 @@
 
 import { runInit } from "./init";
 import { runSkillList, runSkillInstall, runSkillRemove } from "./skill";
+import { runServe } from "./serve";
 
 const VERSION = "0.1.6";
 
@@ -21,6 +22,7 @@ function printUsage(): void {
   console.log("  skill list                    List installed skills");
   console.log("  skill install <source>        Install a skill from URL or local path");
   console.log("  skill remove <name>           Remove an installed skill");
+  console.log("  serve                         Start the Fleet API server (standalone mode)");
   console.log();
   console.log("Init Options:");
   console.log("  --force                       Overwrite existing configuration");
@@ -34,6 +36,19 @@ function printUsage(): void {
   console.log("  https://...                   Raw URL to a SKILL.md file");
   console.log("  github:user/repo/path         GitHub repository shorthand");
   console.log("  /path/to/SKILL.md             Local file path");
+  console.log();
+  console.log("Serve Options:");
+  console.log("  --port <port>               Port to bind (default: 3000, env: FLEET_PORT)");
+  console.log("  --host <host>               Host to bind (default: 0.0.0.0, env: FLEET_HOST)");
+  console.log("  --rotate-token              Rotate the API token (server must be stopped)");
+  console.log();
+  console.log("Serve Environment Variables:");
+  console.log("  FLEET_PORT                  Port to bind (overridden by --port)");
+  console.log("  FLEET_HOST                  Host to bind (overridden by --host)");
+  console.log("  FLEET_NAME                  Server display name (default: Fleet Server)");
+  console.log("  FLEET_DESCRIPTION           Server description (default: empty)");
+  console.log("  FLEET_ALLOWED_ORIGINS       Comma-separated allowed CORS origins (default: *)");
+  console.log("  FLEET_AUTH_DISABLED         Set to 'true' to disable auth (dev mode only)");
 }
 
 function parseArgs(argv: string[]): { command: string; args: string[]; flags: Record<string, string | boolean> } {
@@ -200,6 +215,15 @@ async function main(): Promise<void> {
           console.error("Run 'weave-fleet skill --help' for usage.");
           process.exit(1);
       }
+      break;
+    }
+
+    case "serve": {
+      const rotateTokenFlag = Boolean(flags["rotate-token"]);
+      const portFlag = flags["port"] ? Number(flags["port"]) : undefined;
+      const hostFlag = typeof flags["host"] === "string" ? flags["host"] : undefined;
+
+      await runServe({ port: portFlag, host: hostFlag, rotateToken: rotateTokenFlag });
       break;
     }
 

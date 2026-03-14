@@ -26,12 +26,12 @@ Weave Agent Fleet is currently a monolithic Next.js app — UI and API run toget
 
 ## Tasks
 
-- [ ] **1. Add `bcryptjs` dependency**
+- [x] **1. Add `bcryptjs` dependency**
   - Run `npm install bcryptjs` and `npm install --save-dev @types/bcryptjs`
   - Prefer `bcryptjs` (pure JS, no native bindings) over `bcrypt` to avoid build complexity in the esbuild CLI bundle
   - Verify it appears in `package.json` dependencies
 
-- [ ] **2. Add `getTokenHashPath()` to `src/cli/config-paths.ts`**
+- [x] **2. Add `getTokenHashPath()` to `src/cli/config-paths.ts`**
   - Add a new exported function:
     ```ts
     export function getTokenHashPath(): string {
@@ -41,7 +41,7 @@ Weave Agent Fleet is currently a monolithic Next.js app — UI and API run toget
     ```
   - The `~/.weave/` directory already exists (it holds `fleet.db`). Verify by reading `src/lib/server/database.ts` to confirm the path convention.
 
-- [ ] **3. Create `src/lib/server/token-manager.ts`**
+- [x] **3. Create `src/lib/server/token-manager.ts`**
   - Responsibilities: token generation, hashing, persistence, and verification
   - Exports:
     ```ts
@@ -79,7 +79,7 @@ Weave Agent Fleet is currently a monolithic Next.js app — UI and API run toget
     - `rotateToken()` deletes the existing hash file before regenerating — if deletion fails, throw (do not silently continue)
     - All file I/O errors should propagate as thrown errors (not swallowed)
 
-- [ ] **4. Create `src/middleware.ts` — Next.js auth middleware**
+- [x] **4. Create `src/middleware.ts` — Next.js auth middleware**
   - Next.js Edge Middleware runs before every request and is the correct place for auth
   - The existing `src/proxy.ts` handles CORS but is not a middleware file — this is a new file
   - Location: `src/middleware.ts` (Next.js auto-discovers this at the `src/` root)
@@ -129,7 +129,7 @@ Weave Agent Fleet is currently a monolithic Next.js app — UI and API run toget
   - **Important**: Next.js Edge Middleware cannot use Node.js built-ins directly. `bcryptjs` is pure JS — it works in the Edge runtime. Verify this is the case; if not, move auth into a helper that runs in the Node.js API route layer instead (see note below).
   - **Alternative if Edge Runtime is incompatible**: Create an `src/lib/server/auth-middleware.ts` helper that wraps each route handler, and apply it to all route files. This is more verbose but avoids Edge Runtime constraints. Prefer the middleware approach first; fall back to per-route wrapping only if `bcryptjs` fails in Edge.
 
-- [ ] **5. Create `src/cli/serve.ts` — serve command implementation**
+- [x] **5. Create `src/cli/serve.ts` — serve command implementation**
   - This module is imported by the CLI and handles the `serve` subcommand
   - Exported function: `export async function runServe(options: ServeOptions): Promise<void>`
   - `ServeOptions`:
@@ -175,7 +175,7 @@ Weave Agent Fleet is currently a monolithic Next.js app — UI and API run toget
     ```
   - **Note on Next.js standalone output**: `next.config.ts` already has `output: 'standalone'`. The `weave-fleet` binary is assembled via `scripts/assemble-standalone.sh`. Confirm whether `server.js` from the standalone output is available in the assembled package, and whether spawning it is the right approach vs. using Next.js's programmatic API (`next/dist/server/lib/start-server`). Document the chosen approach in code comments.
 
-- [ ] **6. Wire `serve` into `src/cli/index.ts`**
+- [x] **6. Wire `serve` into `src/cli/index.ts`**
   - Import `runServe` from `./serve`
   - Add `serve` to the `switch (command)` block:
     ```ts
@@ -200,20 +200,20 @@ Weave Agent Fleet is currently a monolithic Next.js app — UI and API run toget
       --rotate-token              Rotate the API token (server must be stopped)
     ```
 
-- [ ] **7. Update `build:cli` script to include `serve.ts` dependencies**
+- [x] **7. Update `build:cli` script to include `serve.ts` dependencies**
   - The CLI is bundled with esbuild: `esbuild src/cli/index.ts --bundle --platform=node --target=node20 --outfile=cli.js --format=cjs`
   - Since `serve.ts` imports `token-manager.ts` which imports `bcryptjs`, esbuild will bundle it automatically
   - Verify the build succeeds: `npm run build:cli`
   - If `bcryptjs` has any issues with esbuild bundling, add `--external:bcryptjs` and ensure it's available at runtime
 
-- [ ] **8. Verify auth middleware doesn't break existing dev/UI mode**
+- [x] **8. Verify auth middleware doesn't break existing dev/UI mode**
   - In dev mode (`npm run dev`), the middleware will require a token on all `/api/` calls from the UI
   - This is the correct behaviour for remote mode but will break the current localhost-only dev workflow
   - **Mitigation**: In the middleware, skip auth when `NODE_ENV === "development"` OR when a `FLEET_AUTH_DISABLED=true` env var is set. This preserves the existing dev experience without requiring a token.
   - Add `FLEET_AUTH_DISABLED` check: if set to `"true"`, the middleware passes all requests through
   - Document this in code comments
 
-- [ ] **9. Create `GET /api/fleet/identity` endpoint**
+- [x] **9. Create `GET /api/fleet/identity` endpoint**
   - New route: `src/app/api/fleet/identity/route.ts`
   - This endpoint is called by Fleet Clients immediately on connection to confirm server identity and display a meaningful label in multi-fleet UIs
   - Response shape (matches the findings doc):
@@ -234,7 +234,7 @@ Weave Agent Fleet is currently a monolithic Next.js app — UI and API run toget
   - **Single-tenant design note**: This endpoint describes *this* server only. It has no awareness of other fleet servers. The multi-fleet aggregation is a client-side concern — this endpoint simply lets the client label the connection correctly in its UI.
   - Add to `ServeOptions` docs: document `FLEET_NAME` and `FLEET_DESCRIPTION` as supported env vars for the `serve` command
 
-- [ ] **10. Update `src/proxy.ts` — configurable CORS allowed origins**
+- [x] **10. Update `src/proxy.ts` — configurable CORS allowed origins**
   - Currently hardcoded to `Access-Control-Allow-Origin: *`
   - In a remote/multi-fleet setup, a web client served from a specific origin connects to this server. Wildcard `*` is acceptable for development but should be tightenable for production.
   - Change: read `FLEET_ALLOWED_ORIGINS` from `process.env`
@@ -253,7 +253,7 @@ Weave Agent Fleet is currently a monolithic Next.js app — UI and API run toget
   - **Single-tenant design note**: The server does not know about other fleet servers. CORS is purely about which *client* origins are allowed to call *this* server. This is the correct scoping — configurable per server, not globally federated.
   - Update `src/cli/index.ts` / `printUsage()` to document `FLEET_ALLOWED_ORIGINS` under Serve Options
 
-- [ ] **11. Inject `window.__FLEET_TOKEN__` into served HTML (monolithic mode)**
+- [x] **11. Inject `window.__FLEET_TOKEN__` into served HTML (monolithic mode)**
   - When the server starts in monolithic mode (UI + API in one process), inject the plaintext token into the HTML page so the browser UI can authenticate without any user action
   - **Where**: the Next.js app's root HTML response. The correct place is `src/app/layout.tsx` — add a `<script>` tag in `<head>` that sets `window.__FLEET_TOKEN__` using a server-side env var
   - **Mechanism**: at startup (in `src/cli/serve.ts` or the launcher), write the plaintext token to a `FLEET_INJECT_TOKEN` env var before spawning the Next.js process. The layout reads `process.env.FLEET_INJECT_TOKEN` server-side and injects it:
@@ -275,7 +275,7 @@ Weave Agent Fleet is currently a monolithic Next.js app — UI and API run toget
     - `weave-fleet serve` (API-only): `window.__FLEET_TOKEN__` is `undefined` in the browser
     - `npm run dev`: `window.__FLEET_TOKEN__` is `undefined`; dev mode still works via `FLEET_AUTH_DISABLED`
 
-- [ ] **12. Manual end-to-end verification**
+- [x] **12. Manual end-to-end verification**
   - Build the CLI: `npm run build:cli`
   - Run `node cli.js serve` — verify token is printed on first start
   - Run `node cli.js serve` again — verify token is NOT printed, server starts silently
