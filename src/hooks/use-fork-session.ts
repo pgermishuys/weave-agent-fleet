@@ -5,7 +5,7 @@ import type { ForkSessionRequest, ForkSessionResponse } from "@/lib/api-types";
 import { apiFetch } from "@/lib/api-client";
 
 export interface UseForkSessionResult {
-  forkSession: (sessionId: string, opts?: ForkSessionRequest) => Promise<ForkSessionResponse>;
+  forkSession: (sessionId: string, opts?: ForkSessionRequest, connectionId?: string) => Promise<ForkSessionResponse>;
   clearError: () => void;
   isForking: boolean;
   forkingSessionId: string | null;
@@ -19,7 +19,7 @@ export function useForkSession(): UseForkSessionResult {
   const isForking = forkingSessionId !== null;
 
   const forkSession = useCallback(
-    async (sessionId: string, opts?: ForkSessionRequest): Promise<ForkSessionResponse> => {
+    async (sessionId: string, opts?: ForkSessionRequest, connectionId?: string): Promise<ForkSessionResponse> => {
       setForkingSessionId(sessionId);
       setError(undefined);
 
@@ -30,7 +30,8 @@ export function useForkSession(): UseForkSessionResult {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(opts ?? {}),
-          }
+          },
+          connectionId
         );
 
         if (!response.ok) {

@@ -55,6 +55,7 @@ export default function SessionDetailPage() {
 
   const sessionId = params.id as string;
   const instanceId = searchParams.get("instanceId") ?? "";
+  const connectionId = searchParams.get("connectionId") ?? undefined;
 
   // Subscribe to sessions context so optimistic title patches (from rename)
   // are reflected immediately on the detail page header.
@@ -65,9 +66,9 @@ export default function SessionDetailPage() {
   }, [contextSessions, sessionId]);
 
   const { sendPrompt, isSending, error: sendError } = useSendPrompt();
-  const { agents } = useAgents(instanceId);
+  const { agents } = useAgents(instanceId, connectionId);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
-  const { providers } = useModels(instanceId);
+  const { providers } = useModels(instanceId, connectionId);
   const [selectedModel, setSelectedModel] = usePersistedState<SelectedModel | null>(
     `model-override:${sessionId}`,
     null
@@ -83,13 +84,14 @@ export default function SessionDetailPage() {
     instanceId,
     setSelectedAgent,
     suppressAutoScrollRef,
+    connectionId,
   );
   const { terminateSession, isTerminating } = useTerminateSession();
   const { abortSession, isAborting } = useAbortSession();
   const { resumeSession, isResuming } = useResumeSession();
   const { deleteSession: permanentDelete, isDeleting } = useDeleteSession();
   const router = useRouter();
-  const { diffs, isLoading: diffsLoading, error: diffsError, fetchDiffs } = useDiffs(sessionId, instanceId);
+  const { diffs, isLoading: diffsLoading, error: diffsError, fetchDiffs } = useDiffs(sessionId, instanceId, connectionId);
   const [isStopped, setIsStopped] = useState(false);
   const [stopConfirm, setStopConfirm] = useState(false);
   const [abortConfirm, setAbortConfirm] = useState(false);
@@ -131,7 +133,7 @@ export default function SessionDetailPage() {
       keywords: ["abort", "cancel", "stop", "interrupt"],
       disabled: isStopped || sessionStatus !== "busy",
       action: () => {
-        abortSession(sessionId, instanceId).catch(() => {
+        abortSession(sessionId, instanceId, connectionId).catch(() => {
           // error surfaced via useAbortSession
         });
       },
@@ -139,7 +141,7 @@ export default function SessionDetailPage() {
     return () => {
       unregisterCommand("interrupt-session");
     };
-  }, [registerCommand, unregisterCommand, bindings, sessionStatus, isStopped, abortSession, sessionId, instanceId]);
+  }, [registerCommand, unregisterCommand, bindings, sessionStatus, isStopped, abortSession, sessionId, instanceId, connectionId]);
 
   const [metadata, setMetadata] = useState<SessionMetadata>({
     workspaceId: null,
@@ -160,7 +162,7 @@ export default function SessionDetailPage() {
     if (parentSessionId) {
       url += `&parentSessionId=${encodeURIComponent(parentSessionId)}`;
     }
-    apiFetch(url)
+    apiFetch(url, undefined, connectionId)
       .then((r) => {
         if (!r.ok) {
           // Instance dead — show resume banner
@@ -184,7 +186,7 @@ export default function SessionDetailPage() {
       .catch(() => {
         setIsResumable(true);
       });
-  }, [sessionId, instanceId, searchParams]);
+  }, [sessionId, instanceId, searchParams, connectionId]);
 
   // Reset metadata state when sessionId changes (e.g. client-side navigation
   // from a parent session to a child session).  Without this, the stale
@@ -263,9 +265,9 @@ export default function SessionDetailPage() {
 
   const handleSend = useCallback(
     async (text: string, agent?: string, model?: SelectedModel) => {
-      await sendPrompt(sessionId, instanceId, text, agent, model ?? undefined);
+      await sendPrompt(sessionId, instanceId, text, agent, model ?? undefined, connectionId);
     },
-    [sendPrompt, sessionId, instanceId]
+    [sendPrompt, sessionId, instanceId, connectionId]
   );
 
   const handleStop = useCallback(async () => {
@@ -274,14 +276,14 @@ export default function SessionDetailPage() {
       return;
     }
     try {
-      await terminateSession(sessionId, instanceId);
+      await terminateSession(sessionId, instanceId, undefined, connectionId);
       setIsStopped(true);
     } catch {
       // error visible via isTerminating pattern
     } finally {
       setStopConfirm(false);
     }
-  }, [stopConfirm, terminateSession, sessionId, instanceId]);
+  }, [stopConfirm, terminateSession, sessionId, instanceId, connectionId]);
 
   const handleAbort = useCallback(async () => {
     if (!abortConfirm) {
@@ -289,14 +291,14 @@ export default function SessionDetailPage() {
       return;
     }
     try {
-      await abortSession(sessionId, instanceId);
+      await abortSession(sessionId, instanceId, connectionId);
       forceIdle();
     } catch {
       // error surfaced via useAbortSession
     } finally {
       setAbortConfirm(false);
     }
-  }, [abortConfirm, abortSession, sessionId, instanceId, forceIdle]);
+  }, [abortConfirm, abortSession, sessionId, instanceId, connectionId, forceIdle]);
 
   // Reset abort confirmation when session leaves busy state
   useEffect(() => {
@@ -307,23 +309,22 @@ export default function SessionDetailPage() {
 
   const handleResume = useCallback(async () => {
     try {
-      const result = await resumeSession(sessionId);
-      router.replace(
-        `/sessions/${encodeURIComponent(result.session.id)}?instanceId=${encodeURIComponent(result.instanceId)}`
-      );
+      const result = await resumeSession(sessionId, connectionId);
+      const url = `/sessions/${encodeURIComponent(result.session.id)}?instanceId=${encodeURIComponent(result.instanceId)}${connectionId ? `&connectionId=${encodeURIComponent(connectionId)}` : ""}`;
+      router.replace(url);
     } catch {
       // error surfaced via useResumeSession
     }
-  }, [resumeSession, router, sessionId]);
+  }, [resumeSession, router, sessionId, connectionId]);
 
   const handlePermanentDelete = useCallback(async () => {
     try {
-      await permanentDelete(sessionId, instanceId);
+      await permanentDelete(sessionId, instanceId, connectionId);
       router.push("/");
     } catch {
       // error surfaced via useDeleteSession
     }
-  }, [permanentDelete, router, sessionId, instanceId]);
+  }, [permanentDelete, router, sessionId, instanceId, connectionId]);
 
   if (!instanceId) {
     return (
@@ -729,6 +730,7 @@ export default function SessionDetailPage() {
         sourceSessionTitle={metadata.title}
         open={showForkDialog}
         onOpenChange={setShowForkDialog}
+        connectionId={connectionId}
       />
     </div>
   );

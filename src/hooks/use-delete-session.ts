@@ -4,7 +4,7 @@ import { useState } from "react";
 import { apiFetch } from "@/lib/api-client";
 
 export interface UseDeleteSessionResult {
-  deleteSession: (sessionId: string, instanceId: string) => Promise<void>;
+  deleteSession: (sessionId: string, instanceId: string, connectionId?: string) => Promise<void>;
   isDeleting: boolean;
   error?: string;
 }
@@ -15,7 +15,8 @@ export function useDeleteSession(): UseDeleteSessionResult {
 
   const deleteSession = async (
     sessionId: string,
-    instanceId: string
+    instanceId: string,
+    connectionId?: string
   ): Promise<void> => {
     setIsDeleting(true);
     setError(undefined);
@@ -25,7 +26,8 @@ export function useDeleteSession(): UseDeleteSessionResult {
 
       const response = await apiFetch(
         `/api/sessions/${encodeURIComponent(sessionId)}?${params.toString()}`,
-        { method: "DELETE" }
+        { method: "DELETE" },
+        connectionId
       );
 
       if (!response.ok) {

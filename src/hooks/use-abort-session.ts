@@ -6,7 +6,8 @@ import { apiFetch } from "@/lib/api-client";
 export interface UseAbortSessionResult {
   abortSession: (
     sessionId: string,
-    instanceId: string
+    instanceId: string,
+    connectionId?: string
   ) => Promise<void>;
   isAborting: boolean;
   error?: string;
@@ -18,7 +19,8 @@ export function useAbortSession(): UseAbortSessionResult {
 
   const abortSession = useCallback(async (
     sessionId: string,
-    instanceId: string
+    instanceId: string,
+    connectionId?: string
   ): Promise<void> => {
     setIsAborting(true);
     setError(undefined);
@@ -28,7 +30,8 @@ export function useAbortSession(): UseAbortSessionResult {
 
       const response = await apiFetch(
         `/api/sessions/${encodeURIComponent(sessionId)}/abort?${params.toString()}`,
-        { method: "POST" }
+        { method: "POST" },
+        connectionId
       );
 
       if (!response.ok) {

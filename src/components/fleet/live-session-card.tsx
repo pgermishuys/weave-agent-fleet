@@ -32,7 +32,7 @@ export const LiveSessionCard = React.memo(function LiveSessionCard({
 }: {
   item: SessionListItem;
   onTerminate: (sessionId: string, instanceId: string) => void;
-  onResume?: (sessionId: string) => void;
+  onResume?: (sessionId: string, connectionId?: string) => void;
   onDelete?: (sessionId: string, instanceId: string) => void;
   onOpen?: (directory: string, tool: OpenTool) => void;
   onAbort?: (sessionId: string, instanceId: string) => void;
@@ -41,6 +41,7 @@ export const LiveSessionCard = React.memo(function LiveSessionCard({
   isChild?: boolean;
 }) {
   const { instanceId, session, isolationStrategy, activityStatus, lifecycleStatus } = item;
+  const connectionId = item.connectionId;
   const isDisconnected = lifecycleStatus === "disconnected";
   const isStopped = lifecycleStatus === "stopped";
   const isCompleted = lifecycleStatus === "completed";
@@ -72,7 +73,7 @@ export const LiveSessionCard = React.memo(function LiveSessionCard({
 
   const cardContent = (
     <div className={`relative group ${isInactive ? "opacity-60" : ""}`}>
-      <Link href={`/sessions/${encodeURIComponent(session.id)}?instanceId=${encodeURIComponent(instanceId)}`}>
+      <Link href={`/sessions/${encodeURIComponent(session.id)}?instanceId=${encodeURIComponent(instanceId)}${connectionId ? `&connectionId=${encodeURIComponent(connectionId)}` : ""}`}>
         <Card className="transition-all hover:border-foreground/20 hover:shadow-md cursor-pointer">
           <CardHeader className="pb-2 pt-4 px-4">
             <div className="flex items-start justify-between">
@@ -195,7 +196,7 @@ export const LiveSessionCard = React.memo(function LiveSessionCard({
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            onResume(session.id);
+            onResume(session.id, connectionId ?? undefined);
           }}
           title={isResuming ? "Resuming…" : "Resume session"}
         >

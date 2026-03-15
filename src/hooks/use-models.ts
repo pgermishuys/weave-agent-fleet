@@ -14,7 +14,7 @@ export interface UseModelsResult {
  * Fetches connected providers and their models for an OpenCode instance.
  * Fetches once on mount; re-fetches if instanceId changes.
  */
-export function useModels(instanceId: string): UseModelsResult {
+export function useModels(instanceId: string, connectionId?: string): UseModelsResult {
   const [providers, setProviders] = useState<AvailableProvider[]>([]);
   const [isLoading, setIsLoading] = useState(!!instanceId);
   const [error, setError] = useState<string | undefined>();
@@ -39,7 +39,8 @@ export function useModels(instanceId: string): UseModelsResult {
       try {
         const response = await apiFetch(
           `/api/instances/${encodeURIComponent(instanceId)}/models`,
-          { signal: controller.signal }
+          { signal: controller.signal },
+          connectionId
         );
         if (!response.ok) {
           const data = await response.json().catch(() => ({}));
@@ -66,7 +67,7 @@ export function useModels(instanceId: string): UseModelsResult {
       cancelled = true;
       controller.abort();
     };
-  }, [instanceId]);
+  }, [instanceId, connectionId]);
 
   return { providers, isLoading, error };
 }

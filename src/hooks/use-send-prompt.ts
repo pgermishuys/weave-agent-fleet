@@ -10,7 +10,8 @@ export interface UseSendPromptResult {
     instanceId: string,
     text: string,
     agent?: string,
-    model?: { providerID: string; modelID: string }
+    model?: { providerID: string; modelID: string },
+    connectionId?: string
   ) => Promise<void>;
   isSending: boolean;
   error?: string;
@@ -21,7 +22,7 @@ export function useSendPrompt(): UseSendPromptResult {
   const [error, setError] = useState<string | undefined>();
 
   const sendPrompt = useCallback(
-    async (sessionId: string, instanceId: string, text: string, agent?: string, model?: { providerID: string; modelID: string }): Promise<void> => {
+    async (sessionId: string, instanceId: string, text: string, agent?: string, model?: { providerID: string; modelID: string }, connectionId?: string): Promise<void> => {
       setIsSending(true);
       setError(undefined);
       try {
@@ -44,7 +45,8 @@ export function useSendPrompt(): UseSendPromptResult {
                 ...(agent ? { agent } : {}),
                 ...(model ? { model } : {}),
               }),
-            }
+            },
+            connectionId
           );
 
           if (!response.ok) {
@@ -61,7 +63,8 @@ export function useSendPrompt(): UseSendPromptResult {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ instanceId, text, agent, model }),
-            }
+            },
+            connectionId
           );
 
           if (!response.ok) {

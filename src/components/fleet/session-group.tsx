@@ -35,7 +35,7 @@ interface SessionGroupProps {
   group: WorkspaceGroup;
   onTerminate: (sessionId: string, instanceId: string) => void;
   onNewSession?: (workspaceDirectory: string) => void;
-  onResume?: (sessionId: string) => void;
+  onResume?: (sessionId: string, connectionId?: string) => void;
   onDelete?: (sessionId: string, instanceId: string) => void;
   onAbort?: (sessionId: string, instanceId: string) => void;
   onOpen?: (directory: string, tool: OpenTool) => void;

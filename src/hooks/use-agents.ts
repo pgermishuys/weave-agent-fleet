@@ -15,7 +15,7 @@ export interface UseAgentsResult {
  * Fetches once on mount (agents are static for a session lifetime).
  * Re-fetches if instanceId changes.
  */
-export function useAgents(instanceId: string): UseAgentsResult {
+export function useAgents(instanceId: string, connectionId?: string): UseAgentsResult {
   const [agents, setAgents] = useState<AutocompleteAgent[]>([]);
   const [isLoading, setIsLoading] = useState(!!instanceId);
   const [error, setError] = useState<string | undefined>();
@@ -40,7 +40,8 @@ export function useAgents(instanceId: string): UseAgentsResult {
       try {
         const response = await apiFetch(
           `/api/instances/${encodeURIComponent(instanceId)}/agents`,
-          { signal: controller.signal }
+          { signal: controller.signal },
+          connectionId
         );
         if (!response.ok) {
           const data = await response.json().catch(() => ({}));
@@ -67,7 +68,7 @@ export function useAgents(instanceId: string): UseAgentsResult {
       cancelled = true;
       controller.abort();
     };
-  }, [instanceId]);
+  }, [instanceId, connectionId]);
 
   return { agents, isLoading, error };
 }

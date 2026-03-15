@@ -6,11 +6,12 @@ import { apiFetch } from "@/lib/api-client";
  */
 export async function fetchSessionStatus(
   sessionId: string,
-  instanceId: string
+  instanceId: string,
+  connectionId?: string
 ): Promise<"idle" | "busy"> {
   try {
     const url = `/api/sessions/${encodeURIComponent(sessionId)}/status?instanceId=${encodeURIComponent(instanceId)}`;
-    const response = await apiFetch(url);
+    const response = await apiFetch(url, undefined, connectionId);
     if (!response.ok) return "idle";
     const data = (await response.json()) as { status?: string };
     if (data.status === "busy") return "busy";

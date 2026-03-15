@@ -35,6 +35,7 @@ interface SidebarSessionItemProps {
 
 export const SidebarSessionItem = React.memo(function SidebarSessionItem({ item, isActive, isChild = false, refetch }: SidebarSessionItemProps) {
   const { instanceId, session, activityStatus, lifecycleStatus } = item;
+  const connectionId = item.connectionId;
   const router = useRouter();
   const { renameSession } = useRenameSession();
   const { patchSessionTitle } = useSessionsContext();
@@ -91,44 +92,43 @@ export const SidebarSessionItem = React.memo(function SidebarSessionItem({ item,
 
   const handleStop = useCallback(async () => {
     try {
-      await terminateSession(session.id, instanceId);
+      await terminateSession(session.id, instanceId, undefined, connectionId);
       refetch();
     } catch {
       // error surfaced inside useTerminateSession
     }
-  }, [terminateSession, session.id, instanceId, refetch]);
+  }, [terminateSession, session.id, instanceId, connectionId, refetch]);
 
   const handleAbort = useCallback(async () => {
     try {
-      await abortSession(session.id, instanceId);
+      await abortSession(session.id, instanceId, connectionId);
     } catch {
       // error surfaced inside useAbortSession
     }
-  }, [abortSession, session.id, instanceId]);
+  }, [abortSession, session.id, instanceId, connectionId]);
 
   const handleDeleteConfirm = useCallback(async () => {
     try {
-      await deleteSession(session.id, instanceId);
+      await deleteSession(session.id, instanceId, connectionId);
       refetch();
     } catch {
       // error surfaced inside useDeleteSession
     } finally {
       setShowDeleteConfirm(false);
     }
-  }, [deleteSession, session.id, instanceId, refetch]);
+  }, [deleteSession, session.id, instanceId, connectionId, refetch]);
 
   const handleResume = useCallback(async () => {
     try {
-      const result = await resumeSession(session.id);
+      const result = await resumeSession(session.id, connectionId);
       refetch();
-      router.push(
-        `/sessions/${encodeURIComponent(result.session.id)}?instanceId=${encodeURIComponent(result.instanceId)}`
-      );
+      const url = `/sessions/${encodeURIComponent(result.session.id)}?instanceId=${encodeURIComponent(result.instanceId)}${connectionId ? `&connectionId=${encodeURIComponent(connectionId)}` : ""}`;
+      router.push(url);
     } catch {
       // error surfaced inside useResumeSession
       refetch();
     }
-  }, [resumeSession, session.id, router, refetch]);
+  }, [resumeSession, session.id, connectionId, router, refetch]);
 
   const handleCopyId = useCallback(() => {
     navigator.clipboard.writeText(session.id).catch(() => {});
@@ -146,7 +146,7 @@ export const SidebarSessionItem = React.memo(function SidebarSessionItem({ item,
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <Link
-            href={`/sessions/${encodeURIComponent(session.id)}?instanceId=${encodeURIComponent(instanceId)}`}
+            href={`/sessions/${encodeURIComponent(session.id)}?instanceId=${encodeURIComponent(instanceId)}${connectionId ? `&connectionId=${encodeURIComponent(connectionId)}` : ""}`}
             data-tree-leaf
             tabIndex={0}
             onClick={(e) => {
@@ -264,6 +264,7 @@ export const SidebarSessionItem = React.memo(function SidebarSessionItem({ item,
         sourceSessionTitle={title}
         open={showForkDialog}
         onOpenChange={setShowForkDialog}
+        connectionId={connectionId}
       />
     </>
   );

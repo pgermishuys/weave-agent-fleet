@@ -63,27 +63,28 @@ function FleetPageInner() {
 
   const handleTerminate = useCallback(async (sessionId: string, instanceId: string) => {
     try {
-      await terminateSession(sessionId, instanceId);
+      const item = sessions.find((s) => s.session.id === sessionId);
+      await terminateSession(sessionId, instanceId, undefined, item?.connectionId);
       refetch();
     } catch {
       // error surfaced inside useTerminateSession
     }
-  }, [terminateSession, refetch]);
+  }, [terminateSession, refetch, sessions]);
 
   const handleAbort = useCallback(async (sessionId: string, instanceId: string) => {
     try {
-      await abortSession(sessionId, instanceId);
+      const item = sessions.find((s) => s.session.id === sessionId);
+      await abortSession(sessionId, instanceId, item?.connectionId);
     } catch {
       // error surfaced inside useAbortSession
     }
-  }, [abortSession]);
+  }, [abortSession, sessions]);
 
-  const handleResume = useCallback(async (sessionId: string) => {
+  const handleResume = useCallback(async (sessionId: string, connectionId?: string) => {
     try {
-      const result = await resumeSession(sessionId);
-      router.push(
-        `/sessions/${encodeURIComponent(result.session.id)}?instanceId=${encodeURIComponent(result.instanceId)}`
-      );
+      const result = await resumeSession(sessionId, connectionId);
+      const url = `/sessions/${encodeURIComponent(result.session.id)}?instanceId=${encodeURIComponent(result.instanceId)}${connectionId ? `&connectionId=${encodeURIComponent(connectionId)}` : ""}`;
+      router.push(url);
     } catch {
       // error surfaced inside useResumeSession
       refetch();
@@ -102,14 +103,15 @@ function FleetPageInner() {
   const handleDeleteConfirm = useCallback(async () => {
     if (!deleteTarget) return;
     try {
-      await deleteSession(deleteTarget.sessionId, deleteTarget.instanceId);
+      const item = sessions.find((s) => s.session.id === deleteTarget.sessionId);
+      await deleteSession(deleteTarget.sessionId, deleteTarget.instanceId, item?.connectionId);
       refetch();
     } catch {
       // error surfaced inside useDeleteSession
     } finally {
       setDeleteTarget(null);
     }
-  }, [deleteTarget, deleteSession, refetch]);
+  }, [deleteTarget, deleteSession, refetch, sessions]);
 
   const handleOpen = useCallback((directory: string, tool: OpenTool) => {
     openDirectory(directory, tool);

@@ -105,7 +105,9 @@ export async function proxy(request: NextRequest) {
   }
 
   const authHeader = request.headers.get("authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
+  const tokenParam = request.nextUrl.searchParams.get("token");
+
+  if (!authHeader?.startsWith("Bearer ") && !tokenParam) {
     return new NextResponse(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: {
@@ -115,7 +117,7 @@ export async function proxy(request: NextRequest) {
     });
   }
 
-  const token = authHeader.slice(7);
+  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : (tokenParam ?? "");
   let valid = false;
   try {
     valid = await bcrypt.compare(token, storedHash);

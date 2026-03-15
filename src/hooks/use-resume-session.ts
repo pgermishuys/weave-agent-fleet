@@ -5,7 +5,7 @@ import type { ResumeSessionResponse } from "@/lib/api-types";
 import { apiFetch } from "@/lib/api-client";
 
 export interface UseResumeSessionResult {
-  resumeSession: (sessionId: string) => Promise<ResumeSessionResponse>;
+  resumeSession: (sessionId: string, connectionId?: string) => Promise<ResumeSessionResponse>;
   isResuming: boolean;
   resumingSessionId: string | null;
   error?: string;
@@ -17,14 +17,15 @@ export function useResumeSession(): UseResumeSessionResult {
 
   const isResuming = resumingSessionId !== null;
 
-  const resumeSession = useCallback(async (sessionId: string): Promise<ResumeSessionResponse> => {
+  const resumeSession = useCallback(async (sessionId: string, connectionId?: string): Promise<ResumeSessionResponse> => {
     setResumingSessionId(sessionId);
     setError(undefined);
 
     try {
       const response = await apiFetch(
         `/api/sessions/${encodeURIComponent(sessionId)}/resume`,
-        { method: "POST" }
+        { method: "POST" },
+        connectionId
       );
 
       if (!response.ok) {

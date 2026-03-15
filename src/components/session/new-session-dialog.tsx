@@ -181,9 +181,8 @@ export function NewSessionDialog({ trigger, open: controlledOpen, onOpenChange, 
         connectionId
       );
       setOpen(false);
-      router.push(
-        `/sessions/${encodeURIComponent(session.id)}?instanceId=${encodeURIComponent(instanceId)}`
-      );
+      const url = `/sessions/${encodeURIComponent(session.id)}?instanceId=${encodeURIComponent(instanceId)}${connectionId ? `&connectionId=${encodeURIComponent(connectionId)}` : ""}`;
+      router.push(url);
     } catch {
       // error is already set by useCreateSession
     }

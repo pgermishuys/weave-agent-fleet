@@ -20,6 +20,8 @@ interface ForkSessionDialogProps {
   sourceSessionTitle?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Connection the session lives on — forwarded to forkSession and the navigation URL */
+  connectionId?: string;
 }
 
 export function ForkSessionDialog({
@@ -27,6 +29,7 @@ export function ForkSessionDialog({
   sourceSessionTitle,
   open,
   onOpenChange,
+  connectionId,
 }: ForkSessionDialogProps) {
   const router = useRouter();
   const [title, setTitle] = useState("");
@@ -48,11 +51,10 @@ export function ForkSessionDialog({
     try {
       const { instanceId, session } = await forkSession(sourceSessionId, {
         title: title.trim() || undefined,
-      });
+      }, connectionId);
       handleClose(false);
-      router.push(
-        `/sessions/${encodeURIComponent(session.id)}?instanceId=${encodeURIComponent(instanceId)}`
-      );
+      const url = `/sessions/${encodeURIComponent(session.id)}?instanceId=${encodeURIComponent(instanceId)}${connectionId ? `&connectionId=${encodeURIComponent(connectionId)}` : ""}`;
+      router.push(url);
     } catch {
       // error is already set by useForkSession
     }

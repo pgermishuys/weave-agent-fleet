@@ -114,6 +114,11 @@ export interface SessionListItem {
    * Instance status — whether the OpenCode process backing this session is healthy.
    */
   typedInstanceStatus: InstanceStatus;
+  /**
+   * Client-side connection identifier — set after fetching, not from the server.
+   * Undefined means "local". Matches a key in FleetConnectionRegistry.
+   */
+  connectionId?: string;
 }
 
 // ─── Streamed Event Model ──────────────────────────────────────────────────

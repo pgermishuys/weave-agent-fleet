@@ -209,7 +209,8 @@ describe("useForkSession", () => {
 
     expect(mockApiFetch).toHaveBeenCalledWith(
       "/api/sessions/db-sess-1/fork",
-      expect.objectContaining({ method: "POST" })
+      expect.objectContaining({ method: "POST" }),
+      undefined
     );
   });
 
@@ -223,7 +224,8 @@ describe("useForkSession", () => {
 
     expect(mockApiFetch).toHaveBeenCalledWith(
       "/api/sessions/session%2Fwith%20spaces/fork",
-      expect.anything()
+      expect.anything(),
+      undefined
     );
   });
 
@@ -239,7 +241,8 @@ describe("useForkSession", () => {
       expect.any(String),
       expect.objectContaining({
         body: JSON.stringify({ title: "My Fork" }),
-      })
+      }),
+      undefined
     );
   });
 
@@ -253,7 +256,23 @@ describe("useForkSession", () => {
 
     expect(mockApiFetch).toHaveBeenCalledWith(
       expect.any(String),
-      expect.objectContaining({ body: "{}" })
+      expect.objectContaining({ body: "{}" }),
+      undefined
+    );
+  });
+
+  it("forwards connectionId to apiFetch", async () => {
+    mockApiFetch.mockResolvedValue(makeOkResponse(makeForkResponse()));
+
+    const { result } = renderHook(() => useForkSession());
+    await act(async () => {
+      await result.current.forkSession("db-sess-1", undefined, "conn-remote-1");
+    });
+
+    expect(mockApiFetch).toHaveBeenCalledWith(
+      "/api/sessions/db-sess-1/fork",
+      expect.objectContaining({ method: "POST" }),
+      "conn-remote-1"
     );
   });
 });

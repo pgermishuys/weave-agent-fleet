@@ -25,7 +25,9 @@ describe("fetchSessionStatus", () => {
 
     expect(result).toBe("busy");
     expect(mockApiFetch).toHaveBeenCalledWith(
-      "/api/sessions/sess-1/status?instanceId=inst-abc"
+      "/api/sessions/sess-1/status?instanceId=inst-abc",
+      undefined,
+      undefined
     );
   });
 
@@ -90,7 +92,24 @@ describe("fetchSessionStatus", () => {
     await fetchSessionStatus("sess/with spaces", "inst&special");
 
     expect(mockApiFetch).toHaveBeenCalledWith(
-      "/api/sessions/sess%2Fwith%20spaces/status?instanceId=inst%26special"
+      "/api/sessions/sess%2Fwith%20spaces/status?instanceId=inst%26special",
+      undefined,
+      undefined
+    );
+  });
+
+  it("ForwardsConnectionIdToApiFetch", async () => {
+    mockApiFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ status: "busy" }),
+    });
+
+    await fetchSessionStatus("sess-1", "inst-abc", "conn-remote-1");
+
+    expect(mockApiFetch).toHaveBeenCalledWith(
+      "/api/sessions/sess-1/status?instanceId=inst-abc",
+      undefined,
+      "conn-remote-1"
     );
   });
 });

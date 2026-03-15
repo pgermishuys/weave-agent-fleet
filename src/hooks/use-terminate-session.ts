@@ -11,7 +11,8 @@ export interface UseTerminateSessionResult {
   terminateSession: (
     sessionId: string,
     instanceId: string,
-    opts?: TerminateSessionOptions
+    opts?: TerminateSessionOptions,
+    connectionId?: string
   ) => Promise<void>;
   isTerminating: boolean;
   error?: string;
@@ -24,7 +25,8 @@ export function useTerminateSession(): UseTerminateSessionResult {
   const terminateSession = async (
     sessionId: string,
     instanceId: string,
-    opts?: TerminateSessionOptions
+    opts?: TerminateSessionOptions,
+    connectionId?: string
   ): Promise<void> => {
     setIsTerminating(true);
     setError(undefined);
@@ -37,7 +39,8 @@ export function useTerminateSession(): UseTerminateSessionResult {
 
       const response = await apiFetch(
         `/api/sessions/${encodeURIComponent(sessionId)}?${params.toString()}`,
-        { method: "DELETE" }
+        { method: "DELETE" },
+        connectionId
       );
 
       if (!response.ok) {

@@ -17,6 +17,7 @@ import { useMessagePagination } from "@/hooks/use-message-pagination";
 import { prependMessages, convertSDKMessageToAccumulated } from "@/lib/pagination-utils";
 import type { SDKMessage } from "@/lib/pagination-utils";
 import { sessionCache } from "@/lib/session-cache";
+import { connectionRegistry } from "@/lib/fleet-connection-registry";
 
 export type SessionConnectionStatus =
   | "connecting"
@@ -80,6 +81,7 @@ export function useSessionEvents(
    * that the messageCount auto-scroll effect is suppressed on the same render.
    */
   suppressAutoScrollRef?: React.MutableRefObject<boolean>,
+  connectionId?: string,
 ): UseSessionEventsResult {
   const [messages, setMessages] = useState<AccumulatedMessage[]>([]);
   const [status, setStatus] = useState<SessionConnectionStatus>("connecting");
@@ -110,6 +112,9 @@ export function useSessionEvents(
   // Keep onAgentSwitch in a ref to avoid stale closures in the event handler
   const onAgentSwitchRef = useRef(onAgentSwitch);
   useEffect(() => { onAgentSwitchRef.current = onAgentSwitch; }, [onAgentSwitch]);
+  // Keep connectionId in a ref so the connect callback always sees the current value
+  const connectionIdRef = useRef(connectionId);
+  useEffect(() => { connectionIdRef.current = connectionId; }, [connectionId]);
   // Track the last known message ID for incremental reconnect loading
   const lastMessageIdRef = useRef<string | null>(null);
 
@@ -146,7 +151,7 @@ export function useSessionEvents(
     }
     try {
       const url = `/api/sessions/${encodeURIComponent(sessionId)}?instanceId=${encodeURIComponent(instanceId)}`;
-      const response = await apiFetch(url);
+      const response = await apiFetch(url, undefined, connectionIdRef.current);
       if (!response.ok) return;
       const data = await response.json() as {
         messages?: SDKMessage[];
@@ -178,7 +183,7 @@ export function useSessionEvents(
     }
     try {
       const url = `/api/sessions/${encodeURIComponent(sessionId)}/messages?instanceId=${encodeURIComponent(instanceId)}&after=${encodeURIComponent(afterId)}`;
-      const response = await apiFetch(url);
+      const response = await apiFetch(url, undefined, connectionIdRef.current);
       if (!response.ok) return loadAllMessages(); // fallback
       const data = await response.json() as { messages?: SDKMessage[] };
       if (!data.messages?.length) return; // no gap
@@ -210,7 +215,7 @@ export function useSessionEvents(
   const loadInitialMessages = useCallback(async (): Promise<void> => {
     if (!sessionId || !instanceId) return;
     try {
-      const accumulated = await paginationLoadInitial(sessionId, instanceId);
+      const accumulated = await paginationLoadInitial(sessionId, instanceId, connectionIdRef.current);
       if (accumulated.length > 0) {
         setMessages(accumulated);
       }
@@ -225,14 +230,23 @@ export function useSessionEvents(
    */
   const loadSessionStatus = useCallback(async (): Promise<void> => {
     if (!sessionId || !instanceId) return;
-    const status = await fetchSessionStatus(sessionId, instanceId);
+    const status = await fetchSessionStatus(sessionId, instanceId, connectionIdRef.current);
     if (isMounted.current) setSessionStatus(status);
   }, [sessionId, instanceId]);
 
   const connect = useCallback(() => {
     if (!isMounted.current) return;
 
-    const url = sseUrl(`/api/sessions/${encodeURIComponent(sessionId)}/events?instanceId=${encodeURIComponent(instanceId)}`);
+    const connId = connectionIdRef.current;
+    let sseUrlPath = `/api/sessions/${encodeURIComponent(sessionId)}/events?instanceId=${encodeURIComponent(instanceId)}`;
+    // For remote connections, EventSource cannot send headers — append token as query param
+    if (connId && connId !== "local") {
+      const token = connectionRegistry.getTokenForConnection(connId);
+      if (token) {
+        sseUrlPath += `&token=${encodeURIComponent(token)}`;
+      }
+    }
+    const url = sseUrl(sseUrlPath, connId ?? undefined);
     const es = new EventSource(url);
     eventSourceRef.current = es;
     setStatus("connecting");
@@ -372,7 +386,7 @@ export function useSessionEvents(
 
   const loadOlderMessages = useCallback(async () => {
     if (!sessionId || !instanceId) return;
-    const older = await paginationLoadOlder(sessionId, instanceId);
+    const older = await paginationLoadOlder(sessionId, instanceId, connectionIdRef.current);
     if (older.length > 0) {
       setMessages((prev: AccumulatedMessage[]) => prependMessages(prev, older));
     }

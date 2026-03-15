@@ -91,6 +91,7 @@ function TaskDelegationItem({ part, currentSessionId }: { part: AccumulatedToolP
   // and the current page's instanceId — no DB lookup required.
   const searchParams = useSearchParams();
   const parentInstanceId = searchParams.get("instanceId");
+  const parentConnectionId = searchParams.get("connectionId");
   const childOpencodeSessionId = getTaskToolSessionId(part);
 
   if (!input) return null;
@@ -104,7 +105,7 @@ function TaskDelegationItem({ part, currentSessionId }: { part: AccumulatedToolP
     : "Subagent Task";
 
   const childUrl = childOpencodeSessionId && parentInstanceId
-    ? `/sessions/${encodeURIComponent(childOpencodeSessionId)}?instanceId=${encodeURIComponent(parentInstanceId)}${currentSessionId ? `&parentSessionId=${encodeURIComponent(currentSessionId)}` : ""}`
+    ? `/sessions/${encodeURIComponent(childOpencodeSessionId)}?instanceId=${encodeURIComponent(parentInstanceId)}${currentSessionId ? `&parentSessionId=${encodeURIComponent(currentSessionId)}` : ""}${parentConnectionId ? `&connectionId=${encodeURIComponent(parentConnectionId)}` : ""}`
     : null;
 
   // Status summary from part.state (no API calls needed)

@@ -29,6 +29,7 @@ export interface UseMessagePaginationReturn extends PaginationState {
   loadInitialMessages: (
     sessionId: string,
     instanceId: string,
+    connectionId?: string,
   ) => Promise<AccumulatedMessage[]>;
   /**
    * Load the next older batch of messages.
@@ -38,6 +39,7 @@ export interface UseMessagePaginationReturn extends PaginationState {
   loadOlderMessages: (
     sessionId: string,
     instanceId: string,
+    connectionId?: string,
   ) => Promise<AccumulatedMessage[]>;
   /** Reset pagination state (e.g. on full reconnect recovery). */
   resetPagination: () => void;
@@ -65,10 +67,11 @@ export function useMessagePagination(): UseMessagePaginationReturn {
     async (
       sessionId: string,
       instanceId: string,
+      connectionId?: string,
     ): Promise<AccumulatedMessage[]> => {
       try {
         const url = `/api/sessions/${encodeURIComponent(sessionId)}/messages?instanceId=${encodeURIComponent(instanceId)}&limit=${DEFAULT_PAGE_SIZE}`;
-        const response = await apiFetch(url);
+        const response = await apiFetch(url, undefined, connectionId);
         if (!response.ok) {
           setLoadError("Failed to load initial messages");
           return [];
@@ -100,6 +103,7 @@ export function useMessagePagination(): UseMessagePaginationReturn {
     async (
       sessionId: string,
       instanceId: string,
+      connectionId?: string,
     ): Promise<AccumulatedMessage[]> => {
       // Guards: no more messages, already loading, or too soon after last fetch
       if (!hasMore || isLoadingOlder) return [];
@@ -120,7 +124,7 @@ export function useMessagePagination(): UseMessagePaginationReturn {
         }
 
         const url = `/api/sessions/${encodeURIComponent(sessionId)}/messages?${params.toString()}`;
-        const response = await apiFetch(url);
+        const response = await apiFetch(url, undefined, connectionId);
         if (!response.ok) {
           // Don't change hasMore on error — allow retry
           setLoadError("Failed to load older messages");
