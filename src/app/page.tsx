@@ -50,8 +50,7 @@ function FleetPageInner() {
     { groupBy: "directory", sortBy: "recent" }
   );
   const [search, setSearch] = useState("");
-  const [activeServerFilter, setActiveServerFilter] = useState<string | "all">("all");
-  const { connections } = useFleetConnections();
+  const { connections, activeServerFilter, setActiveServerFilter } = useFleetConnections();
 
   const handleGroupByChange = useCallback((groupBy: GroupBy) => {
     setPrefs((prev) => ({ ...prev, groupBy }));
@@ -144,16 +143,6 @@ function FleetPageInner() {
       return title.includes(q) || dir.includes(q) || displayName.includes(q);
     });
   }, [serverFiltered, search]);
-
-  // Compute session counts per connection for filter pills
-  const sessionCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const s of workspaceFiltered) {
-      const connId = (s as SessionListItem & { connectionId?: string }).connectionId ?? "local";
-      counts[connId] = (counts[connId] ?? 0) + 1;
-    }
-    return counts;
-  }, [workspaceFiltered]);
 
   // Apply sort within session arrays
   const sortSessions = useCallback((items: SessionListItem[]): SessionListItem[] => {
@@ -498,9 +487,6 @@ function FleetPageInner() {
           onGroupByChange={handleGroupByChange}
           onSortByChange={handleSortByChange}
           onSearchChange={setSearch}
-          activeServerFilter={activeServerFilter}
-          onServerFilterChange={setActiveServerFilter}
-          sessionCounts={sessionCounts}
         />
 
         {isLoading && sessions.length === 0 && (

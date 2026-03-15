@@ -1,0 +1,11 @@
+{
+  "active_plan": "/Users/pgermishuys/source/weave-agent-fleet/.weave/plans/fix-remote-session-connectionid.md",
+  "started_at": "2026-03-15T20:01:52.717Z",
+  "session_ids": [
+    "ses_30d0052a3ffe3nmMozsfp7cwRq"
+  ],
+  "plan_name": "fix-remote-session-connectionid",
+  "agent": "tapestry",
+  "start_sha": "66f4e81fd8faccfdce03575a4d1ba2ba0046fdae",
+  "paused": true
+}

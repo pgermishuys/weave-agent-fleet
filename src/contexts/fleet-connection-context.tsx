@@ -20,6 +20,9 @@ export interface FleetConnectionContextValue {
   ) => void;
   /** Update runtime status (called by useConnectionHealth) */
   setConnectionStatus: (id: string, status: ConnectionStatus) => void;
+  /** The connection id currently used to filter the session grid, or "all" for no filter. */
+  activeServerFilter: string | "all";
+  setActiveServerFilter: (id: string | "all") => void;
 }
 
 const FleetConnectionContext = createContext<FleetConnectionContextValue | null>(null);
@@ -42,6 +45,7 @@ export function FleetConnectionProvider({ children }: FleetConnectionProviderPro
   // Safe defaults matching server output — both sides start from [LOCAL_CONNECTION]
   const [connections, setConnections] = useState<FleetConnection[]>([LOCAL_CONNECTION]);
   const [activeConnection, setActiveConnectionState] = useState<FleetConnection>(LOCAL_CONNECTION);
+  const [activeServerFilter, setActiveServerFilter] = useState<string | "all">("all");
 
   const refreshState = useCallback(() => {
     setConnections(connectionRegistry.getConnections());
@@ -96,6 +100,13 @@ export function FleetConnectionProvider({ children }: FleetConnectionProviderPro
     []
   );
 
+  // Guard: if the active server filter references a connection that has been removed, reset to "all"
+  useEffect(() => {
+    if (activeServerFilter !== "all" && !connections.some((c) => c.id === activeServerFilter)) {
+      setActiveServerFilter("all");
+    }
+  }, [connections, activeServerFilter]);
+
   const value: FleetConnectionContextValue = {
     connections,
     activeConnection,
@@ -104,6 +115,8 @@ export function FleetConnectionProvider({ children }: FleetConnectionProviderPro
     removeConnection,
     updateConnection,
     setConnectionStatus,
+    activeServerFilter,
+    setActiveServerFilter,
   };
 
   return (

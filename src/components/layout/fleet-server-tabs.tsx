@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { Monitor, Plus } from "lucide-react";
+import { LayoutGrid, Monitor, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useFleetConnections } from "@/hooks/use-fleet-connections";
 import type { ConnectionStatus } from "@/lib/fleet-connection-registry";
@@ -28,8 +27,13 @@ interface FleetServerTabsProps {
  * Shows a ghost "Connect a server" tab alongside Local when only 1 connection exists.
  */
 export function FleetServerTabs({ onAddServerClick }: FleetServerTabsProps) {
-  const { connections, activeConnection, setActiveConnection } =
-    useFleetConnections();
+  const {
+    connections,
+    activeConnection,
+    setActiveConnection,
+    activeServerFilter,
+    setActiveServerFilter,
+  } = useFleetConnections();
 
   // Ghost tab only when there's exactly 1 connection (Local only)
   const showGhostTab = connections.length === 1;
@@ -39,7 +43,7 @@ export function FleetServerTabs({ onAddServerClick }: FleetServerTabsProps) {
     return null;
   }
 
-  // If only 1 connection, show Local + ghost tab
+  // If only 1 connection, show Local + ghost tab (no filter needed)
   if (showGhostTab) {
     return (
       <div className="flex items-center gap-0.5 px-2 pb-1">
@@ -72,16 +76,34 @@ export function FleetServerTabs({ onAddServerClick }: FleetServerTabsProps) {
     );
   }
 
-  // 2+ connections — render all tabs
+  // 2+ connections — render "All" tab + one tab per connection
   return (
     <div className="flex items-center gap-0.5 px-2 pb-1 flex-wrap">
+      {/* All tab */}
+      <button
+        type="button"
+        onClick={() => setActiveServerFilter("all")}
+        className={cn(
+          "flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors",
+          activeServerFilter === "all"
+            ? "bg-sidebar-accent text-sidebar-accent-foreground"
+            : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
+        )}
+      >
+        <LayoutGrid className="h-3 w-3 shrink-0" />
+        <span>All</span>
+      </button>
+
       {connections.map((conn) => {
-        const isActive = conn.id === activeConnection.id;
+        const isActive = activeServerFilter === conn.id;
         return (
           <button
             key={conn.id}
             type="button"
-            onClick={() => setActiveConnection(conn.id)}
+            onClick={() => {
+              setActiveServerFilter(conn.id);
+              setActiveConnection(conn.id);
+            }}
             className={cn(
               "flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors",
               isActive

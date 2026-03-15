@@ -10,8 +10,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useFleetConnections } from "@/hooks/use-fleet-connections";
-import { cn } from "@/lib/utils";
 
 export type GroupBy = "directory" | "session-status" | "connection-status" | "source" | "none";
 export type SortBy = "recent" | "name" | "status";
@@ -76,11 +74,6 @@ interface FleetToolbarProps {
   onGroupByChange: (groupBy: GroupBy) => void;
   onSortByChange: (sortBy: SortBy) => void;
   onSearchChange: (search: string) => void;
-  /** Active server filter — "all" or a connection id. Shown only when 2+ connections. */
-  activeServerFilter?: string | "all";
-  onServerFilterChange?: (id: string | "all") => void;
-  /** Session counts per connection id (for pill badges) */
-  sessionCounts?: Record<string, number>;
 }
 
 export function FleetToolbar({
@@ -90,13 +83,7 @@ export function FleetToolbar({
   onGroupByChange,
   onSortByChange,
   onSearchChange,
-  activeServerFilter = "all",
-  onServerFilterChange,
-  sessionCounts = {},
 }: FleetToolbarProps) {
-  const { connections } = useFleetConnections();
-  const isMultiServer = connections.length >= 2;
-
   // Persist preferences when they change
   useEffect(() => {
     savePrefs({ groupBy, sortBy });
@@ -104,53 +91,6 @@ export function FleetToolbar({
 
   return (
     <div className="space-y-2">
-      {/* Server filter pills — hidden for single-server users */}
-      {isMultiServer && onServerFilterChange && (
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {/* All Servers pill */}
-          <button
-            type="button"
-            onClick={() => onServerFilterChange("all")}
-            className={cn(
-              "rounded-full px-3 py-1 text-xs font-medium transition-colors border",
-              activeServerFilter === "all"
-                ? "bg-primary text-primary-foreground border-primary"
-                : "bg-background text-muted-foreground border-input hover:text-foreground hover:border-foreground/40"
-            )}
-          >
-            All Servers
-          </button>
-
-          {connections.map((conn) => {
-            const count = sessionCounts[conn.id] ?? 0;
-            const isActive = activeServerFilter === conn.id;
-            const isOffline = conn.status === "offline" || conn.status === "error";
-            return (
-              <button
-                key={conn.id}
-                type="button"
-                onClick={() => onServerFilterChange(conn.id)}
-                className={cn(
-                  "rounded-full px-3 py-1 text-xs font-medium transition-colors border",
-                  isActive
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : isOffline
-                    ? "bg-background text-muted-foreground/50 border-input"
-                    : "bg-background text-muted-foreground border-input hover:text-foreground hover:border-foreground/40"
-                )}
-              >
-                {conn.name}
-                {isOffline ? (
-                  <span className="ml-1 opacity-60">· offline</span>
-                ) : (
-                  <span className="ml-1 opacity-70">· {count}</span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
       {/* Search + Group + Sort row */}
       <div className="flex items-center gap-3">
         {/* Search */}
