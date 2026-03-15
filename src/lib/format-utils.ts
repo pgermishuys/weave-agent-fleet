@@ -38,17 +38,26 @@ const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
  * - Same calendar day as now → "2:34 PM" (time only)
  * - Different day → "Mar 1, 2:34 PM" (short month + day + time)
  * - Falsy / NaN → "" (graceful fallback)
+ *
+ * @param timestamp - unix milliseconds
+ * @param now       - reference time (Date or unix ms). If falsy/0 → always use dateTimeFormatter (server-safe)
  */
-export function formatTimestamp(timestamp: number | undefined | null): string {
+export function formatTimestamp(timestamp: number | undefined | null, now?: Date | number): string {
   if (!timestamp || isNaN(timestamp)) return "";
 
   const date = new Date(timestamp);
-  const now = new Date();
+
+  // If now is not provided or is falsy (e.g. 0 from server snapshot), skip same-day check
+  if (!now) {
+    return dateTimeFormatter.format(date);
+  }
+
+  const nowDate = now instanceof Date ? now : new Date(now);
 
   const sameDay =
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate();
+    date.getFullYear() === nowDate.getFullYear() &&
+    date.getMonth() === nowDate.getMonth() &&
+    date.getDate() === nowDate.getDate();
 
   return sameDay ? timeOnlyFormatter.format(date) : dateTimeFormatter.format(date);
 }

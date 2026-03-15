@@ -598,7 +598,7 @@ export default function SessionDetailPage() {
                     <Clock className="h-3 w-3 text-muted-foreground" />
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Created</p>
                   </div>
-                  <p className="text-xs">{new Date(metadata.createdAt).toLocaleString()}</p>
+                  <p className="text-xs">{new Date(metadata.createdAt).toLocaleString('en-US', { timeZone: 'UTC' })}</p>
                 </div>
               )}
 
@@ -610,7 +610,7 @@ export default function SessionDetailPage() {
                   <Hash className="h-3 w-3 text-muted-foreground" />
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Tokens</p>
                 </div>
-                <p className="text-xs font-mono">{totalTokens.toLocaleString()}</p>
+                <p className="text-xs font-mono">{totalTokens.toLocaleString('en-US')}</p>
               </div>
 
               {/* Changes summary */}

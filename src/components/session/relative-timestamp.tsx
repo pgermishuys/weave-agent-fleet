@@ -19,7 +19,7 @@ export function RelativeTimestamp({ timestamp }: RelativeTimestampProps) {
         </span>
       </TooltipTrigger>
       <TooltipContent>
-        {formatTimestamp(timestamp)}
+        {formatTimestamp(timestamp, now)}
       </TooltipContent>
     </Tooltip>
   );

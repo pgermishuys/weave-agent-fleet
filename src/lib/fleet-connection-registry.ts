@@ -24,7 +24,7 @@ type PersistedConnection = Omit<FleetConnection, "status" | "isLocal">;
 const CONNECTIONS_KEY = "weave:fleet:connections";
 const ACTIVE_CONNECTION_KEY = "weave:fleet:activeConnectionId";
 
-const LOCAL_CONNECTION: FleetConnection = {
+export const LOCAL_CONNECTION: FleetConnection = {
   id: "local",
   name: "Local",
   url: "",          // relative, same-origin

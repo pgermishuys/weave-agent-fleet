@@ -76,8 +76,8 @@ function printTokenBox(token: string): void {
  * Locate the Next.js standalone server.js.
  *
  * When assembled via assemble-standalone.sh, server.js lives alongside cli.js.
- * In development (running from source), it lives under .next/standalone/ in
- * the project root (two levels up from src/cli/).
+ * In development (running as the bundled cli.js at the project root), it lives
+ * under .next/standalone/ relative to __dirname.
  */
 function findServerJs(): string {
   // Assembled standalone: server.js is next to cli.js (__dirname)
@@ -86,10 +86,9 @@ function findServerJs(): string {
     return standaloneNext;
   }
 
-  // Development fallback: resolve from project root
-  // __dirname = <project>/src/cli (TypeScript source), cli.js = <project>/cli.js
-  // .next/standalone is at <project>/.next/standalone/
-  const projectRoot = join(__dirname, "..", "..");
+  // Development fallback: when running the bundled cli.js from the project root,
+  // __dirname IS the project root (not src/cli/). .next/standalone is a sibling.
+  const projectRoot = __dirname;
   const devNext = join(projectRoot, ".next", "standalone", "server.js");
   if (existsSync(devNext)) {
     return devNext;

@@ -2200,7 +2200,7 @@ function findServerJs() {
   if ((0, import_fs6.existsSync)(standaloneNext)) {
     return standaloneNext;
   }
-  const projectRoot = (0, import_path7.join)(__dirname, "..", "..");
+  const projectRoot = __dirname;
   const devNext = (0, import_path7.join)(projectRoot, ".next", "standalone", "server.js");
   if ((0, import_fs6.existsSync)(devNext)) {
     return devNext;

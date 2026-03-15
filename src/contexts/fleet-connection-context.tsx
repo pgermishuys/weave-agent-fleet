@@ -1,8 +1,9 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import {
   connectionRegistry,
+  LOCAL_CONNECTION,
   type FleetConnection,
   type ConnectionStatus,
 } from "@/lib/fleet-connection-registry";
@@ -38,18 +39,17 @@ interface FleetConnectionProviderProps {
 }
 
 export function FleetConnectionProvider({ children }: FleetConnectionProviderProps) {
-  // Seed state from registry; mutations call registry + setState to trigger re-renders
-  const [connections, setConnections] = useState<FleetConnection[]>(() =>
-    connectionRegistry.getConnections()
-  );
-  const [activeConnection, setActiveConnectionState] = useState<FleetConnection>(() =>
-    connectionRegistry.getActiveConnection()
-  );
+  // Safe defaults matching server output — both sides start from [LOCAL_CONNECTION]
+  const [connections, setConnections] = useState<FleetConnection[]>([LOCAL_CONNECTION]);
+  const [activeConnection, setActiveConnectionState] = useState<FleetConnection>(LOCAL_CONNECTION);
 
   const refreshState = useCallback(() => {
     setConnections(connectionRegistry.getConnections());
     setActiveConnectionState(connectionRegistry.getActiveConnection());
   }, []);
+
+  // After mount, hydrate from localStorage via the registry
+  useEffect(() => { refreshState(); }, [refreshState]);
 
   const setActiveConnection = useCallback(
     (id: string) => {

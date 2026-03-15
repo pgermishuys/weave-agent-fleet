@@ -347,7 +347,7 @@ describe("formatTimestamp", () => {
     // Create a timestamp for today at 14:34 local time
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 14, 34, 0);
-    const result = formatTimestamp(today.getTime());
+    const result = formatTimestamp(today.getTime(), now);
     // Should produce time-only like "2:34 PM"
     expect(result).toBe("2:34 PM");
   });
@@ -357,6 +357,19 @@ describe("formatTimestamp", () => {
     const past = new Date(2024, 0, 15, 9, 5, 0);
     const result = formatTimestamp(past.getTime());
     // Should include month + day + time like "Jan 15, 9:05 AM"
+    expect(result).toMatch(/Jan 15.+9:05 AM/);
+  });
+
+  it("returns full date+time when now is not provided (server-safe fallback)", () => {
+    // Without now, always use dateTimeFormatter (server-safe)
+    const past = new Date(2024, 0, 15, 9, 5, 0);
+    const result = formatTimestamp(past.getTime());
+    expect(result).toMatch(/Jan 15.+9:05 AM/);
+  });
+
+  it("returns full date+time when now is 0 (server snapshot sentinel)", () => {
+    const ts = new Date(2024, 0, 15, 9, 5, 0);
+    const result = formatTimestamp(ts.getTime(), 0);
     expect(result).toMatch(/Jan 15.+9:05 AM/);
   });
 

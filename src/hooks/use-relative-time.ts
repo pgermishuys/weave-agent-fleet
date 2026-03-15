@@ -28,7 +28,7 @@ function getSnapshot(): number {
 }
 
 function getServerSnapshot(): number {
-  return Date.now();
+  return 0;
 }
 
 /**
