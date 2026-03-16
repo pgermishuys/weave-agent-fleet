@@ -22,7 +22,7 @@
   "dependencies": {
     "@opencode-ai/sdk": "^1.2.24",
     "@tauri-apps/api": "^2.10.1",
-    "better-sqlite3": "^12.6.2",
+    "better-sqlite3": "^12.8.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
