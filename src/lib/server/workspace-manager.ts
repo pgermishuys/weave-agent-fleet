@@ -3,17 +3,18 @@
  *
  * Supports three isolation strategies:
  * - `existing`: use a user-specified directory as-is (no copy/clone)
- * - `worktree`: create a git worktree as a sibling of the source repo (same-repo parallelism)
+ * - `worktree`: create a git worktree under a dedicated sibling folder (same-repo parallelism)
  * - `clone`: shallow-clone a git repo into a new workspace directory (ephemeral)
  *
- * Worktree directories are placed alongside the source repo with the naming convention
- * `{repo-name}-{hyphenated-branch-name}` (e.g. `my-project-feature-auth`).
+ * Worktree directories are placed under a dedicated sibling folder with the naming
+ * convention `{repo-name}-worktrees/{hyphenated-branch-name}`
+ * (e.g. `my-project-worktrees/feature-auth`).
  * Clone workspaces are created under a configurable root directory
  * (WEAVE_WORKSPACE_ROOT env var, default ~/.weave/workspaces/).
  */
 
 import { execFile } from "child_process";
-import { existsSync, mkdirSync, rmSync, statSync } from "fs";
+import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "fs";
 import { homedir } from "os";
 import { basename, dirname, join, resolve } from "path";
 import { randomUUID } from "crypto";
@@ -155,14 +156,15 @@ export async function createWorkspace(
 
       const branchName = branch ?? `weave-session-${id.slice(0, 8)}`;
 
-      // Place worktree as a sibling of the source repo directory.
-      // Naming: {repo-name}-{hyphenated-branch-name}
-      // e.g. source "C:\repos\my-project" + branch "feature/auth" → "C:\repos\my-project-feature-auth"
+      // Place worktree under a dedicated sibling folder to avoid polluting the parent.
+      // Naming: {repo-name}-worktrees/{hyphenated-branch-name}
+      // e.g. source "C:\repos\my-project" + branch "feature/auth"
+      //   → "C:\repos\my-project-worktrees\feature-auth"
       const repoName = basename(sourceDirectory);
       const hyphenatedBranch = branchName.replace(/[/\\]/g, "-");
-      const worktreeDirName = `${repoName}-${hyphenatedBranch}`;
-      const parentDir = dirname(sourceDirectory);
-      const workspaceDir = join(parentDir, worktreeDirName);
+      const worktreesRoot = join(dirname(sourceDirectory), `${repoName}-worktrees`);
+      mkdirSync(worktreesRoot, { recursive: true });
+      const workspaceDir = join(worktreesRoot, hyphenatedBranch);
 
       await execGitAsync(
         ["worktree", "add", workspaceDir, "-b", branchName],
@@ -237,6 +239,16 @@ export async function cleanupWorkspace(id: string): Promise<void> {
         } catch {
           // If git worktree remove fails, fall back to manual directory removal
           rmSync(ws.directory, { recursive: true, force: true });
+        }
+
+        // Remove the -worktrees parent folder if it is now empty
+        const worktreesRoot = dirname(ws.directory);
+        if (
+          existsSync(worktreesRoot) &&
+          worktreesRoot.endsWith("-worktrees") &&
+          readdirSync(worktreesRoot).length === 0
+        ) {
+          rmSync(worktreesRoot, { recursive: true, force: true });
         }
       }
       markWorkspaceCleaned(id);

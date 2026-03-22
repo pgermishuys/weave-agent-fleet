@@ -16,7 +16,7 @@
 
 import { mkdirSync, rmSync, existsSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
-import { join, resolve } from "path";
+import { join, resolve, basename } from "path";
 import { randomUUID } from "crypto";
 import { execSync } from "child_process";
 import { _resetDbForTests } from "@/lib/server/database";
@@ -370,12 +370,16 @@ describe("worktree isolation — end-to-end lifecycle", () => {
     const repo = trackDir(makeGitRepo());
     const ws = await createWorkspace({ sourceDirectory: repo, strategy: "worktree" });
 
-    // Worktree directory was created as a sibling of the source repo
+    // Worktree directory was created under {repoName}-worktrees/ sibling folder
     expect(existsSync(ws.directory)).toBe(true);
-    expect(resolve(join(ws.directory, ".."))).toBe(resolve(join(repo, "..")));
+    const repoParent = resolve(join(repo, ".."));
+    const worktreesFolder = resolve(join(ws.directory, ".."));
+    expect(resolve(join(worktreesFolder, ".."))).toBe(repoParent);
+    expect(basename(worktreesFolder)).toBe(`${basename(repo)}-worktrees`);
 
-    // Track the worktree directory for cleanup in case test fails
+    // Track the worktree directory and parent -worktrees folder for cleanup in case test fails
     trackDir(ws.directory);
+    trackDir(resolve(join(ws.directory, "..")));
 
     // It's a valid git checkout (not just a plain directory)
     const gitDir = execSync("git rev-parse --git-dir", {
@@ -415,19 +419,22 @@ describe("worktree isolation — end-to-end lifecycle", () => {
       branch: "feature/test-worktree",
     });
 
-    // Track the worktree directory for cleanup in case test fails
+    // Track the worktree directory and parent -worktrees folder for cleanup in case test fails
     trackDir(ws.directory);
+    trackDir(resolve(join(ws.directory, "..")));
 
     const dbWs = getWorkspace(ws.id);
     expect(dbWs?.branch).toBe("feature/test-worktree");
     expect(dbWs?.isolation_strategy).toBe("worktree");
     expect(dbWs?.source_directory).toBe(resolve(repo));
 
-    // Worktree directory should use the repo name + hyphenated branch name
+    // Worktree directory should be under {repoName}-worktrees/{hyphenated-branch}
     const repoName = repo.split(/[/\\]/).pop()!;
-    const expectedDirName = `${repoName}-feature-test-worktree`;
-    const actualDirName = ws.directory.split(/[/\\]/).pop()!;
-    expect(actualDirName).toBe(expectedDirName);
+    const pathParts = ws.directory.split(/[/\\]/);
+    const actualDirName = pathParts.pop()!;
+    const actualParentName = pathParts.pop()!;
+    expect(actualParentName).toBe(`${repoName}-worktrees`);
+    expect(actualDirName).toBe("feature-test-worktree");
 
     // Check the branch exists in the worktree
     const currentBranch = execSync("git branch --show-current", {
