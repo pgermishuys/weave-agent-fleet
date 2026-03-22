@@ -14,6 +14,10 @@ interface UseBookmarkedReposResult {
   hasRepo: (fullName: string) => boolean;
 }
 
+function sortByName(repos: BookmarkedRepo[]): BookmarkedRepo[] {
+  return repos.toSorted((a, b) => a.fullName.localeCompare(b.fullName));
+}
+
 async function syncToServer(repos: BookmarkedRepo[]): Promise<void> {
   try {
     await fetch(BOOKMARKS_API, {
@@ -69,7 +73,7 @@ export function useBookmarkedRepos(): UseBookmarkedReposResult {
         // localStorage unavailable or parse error — skip migration
       }
 
-      setRepos(finalRepos);
+      setRepos(sortByName(finalRepos));
     }
 
     void loadAndMigrate();
@@ -78,7 +82,7 @@ export function useBookmarkedRepos(): UseBookmarkedReposResult {
   const addRepo = useCallback((repo: BookmarkedRepo) => {
     setRepos((prev) => {
       if (prev.some((r) => r.fullName === repo.fullName)) return prev;
-      const next = [...prev, repo];
+      const next = sortByName([...prev, repo]);
       void syncToServer(next);
       return next;
     });
