@@ -16,7 +16,7 @@
 import { execFile } from "child_process";
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "fs";
 import { homedir } from "os";
-import { basename, dirname, join, resolve } from "path";
+import { basename, dirname, join, resolve, sep } from "path";
 import { randomUUID } from "crypto";
 import { promisify } from "util";
 import {
@@ -165,6 +165,11 @@ export async function createWorkspace(
       const worktreesRoot = join(dirname(sourceDirectory), `${repoName}-worktrees`);
       mkdirSync(worktreesRoot, { recursive: true });
       const workspaceDir = join(worktreesRoot, hyphenatedBranch);
+
+      // Guard against path traversal — resolved path must stay under worktreesRoot
+      if (!resolve(workspaceDir).startsWith(resolve(worktreesRoot) + sep)) {
+        throw new Error(`Invalid branch name results in path outside worktree root: ${branchName}`);
+      }
 
       await execGitAsync(
         ["worktree", "add", workspaceDir, "-b", branchName],
