@@ -162,14 +162,21 @@ export async function createWorkspace(
       //   → "C:\repos\my-project-worktrees\feature-auth"
       const repoName = basename(sourceDirectory);
       const hyphenatedBranch = branchName.replace(/[/\\]/g, "-");
-      const worktreesRoot = join(dirname(sourceDirectory), `${repoName}-worktrees`);
-      mkdirSync(worktreesRoot, { recursive: true });
+      const parentDir = resolve(dirname(sourceDirectory));
+      const worktreesRoot = join(parentDir, `${repoName}-worktrees`);
       const workspaceDir = join(worktreesRoot, hyphenatedBranch);
 
-      // Guard against path traversal — resolved path must stay under worktreesRoot
-      if (!resolve(workspaceDir).startsWith(resolve(worktreesRoot) + sep)) {
+      // Guard against path traversal — both paths must stay under the parent directory
+      const resolvedWorktreesRoot = resolve(worktreesRoot);
+      const resolvedWorkspaceDir = resolve(workspaceDir);
+      if (!resolvedWorktreesRoot.startsWith(parentDir + sep)) {
+        throw new Error(`Worktree root escapes parent directory: ${resolvedWorktreesRoot}`);
+      }
+      if (!resolvedWorkspaceDir.startsWith(resolvedWorktreesRoot + sep)) {
         throw new Error(`Invalid branch name results in path outside worktree root: ${branchName}`);
       }
+
+      mkdirSync(worktreesRoot, { recursive: true });
 
       await execGitAsync(
         ["worktree", "add", workspaceDir, "-b", branchName],
