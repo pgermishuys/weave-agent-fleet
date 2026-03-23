@@ -2,11 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 
-/**
- * Global error boundary — renders outside of RootLayout.
- * Must be fully standalone (own <html>/<body>) with no provider dependencies.
- * Uses inline styles only (no Tailwind — this renders outside RootLayout).
- */
 export default function GlobalError({
   error,
   reset,
@@ -17,7 +12,6 @@ export default function GlobalError({
   const [showStack, setShowStack] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Structured error logging — fire once per error boundary activation, not on every re-render
   const errorRef = useRef(error);
   useEffect(() => {
     const errorPayload = {
@@ -47,7 +41,6 @@ export default function GlobalError({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Clipboard API may not be available
     }
   };
 
@@ -71,7 +64,6 @@ export default function GlobalError({
               textAlign: "center",
             }}
           >
-            {/* Error icon */}
             <div
               style={{
                 width: 48,
@@ -128,7 +120,6 @@ export default function GlobalError({
               </p>
             )}
 
-            {/* Action buttons */}
             <div
               style={{
                 display: "flex",
@@ -170,7 +161,6 @@ export default function GlobalError({
               </button>
             </div>
 
-            {/* Stack trace toggle (dev only) */}
             {isDev && error.stack && (
               <div style={{ textAlign: "left" }}>
                 <button

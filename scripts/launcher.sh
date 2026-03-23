@@ -81,6 +81,7 @@ case "${1:-}" in
     ;;
   update)
     echo "Updating Weave Fleet..."
+    export WEAVE_UPDATE_CHANNEL="${WEAVE_UPDATE_CHANNEL:-stable}"
     if command -v curl >/dev/null 2>&1; then
       exec sh -c "curl -fsSL https://get.tryweave.io/agent-fleet.sh | sh"
     elif command -v wget >/dev/null 2>&1; then
@@ -129,6 +130,7 @@ case "${1:-}" in
     echo "Environment variables:"
     echo "  PORT             Server port (default: 3000)"
     echo "  WEAVE_HOSTNAME   Server bind address (default: 0.0.0.0)"
+    echo "  WEAVE_UPDATE_CHANNEL Update channel for 'update' (stable|dev)"
     echo "  WEAVE_DB_PATH    Database file path (default: ~/.weave/fleet.db)"
     echo "  OPENCODE_BIN     Full path to opencode binary (if not on PATH)"
     exit 0
@@ -171,6 +173,15 @@ fi
 export NODE_ENV=production
 export PORT="${PORT:-3000}"
 export HOSTNAME="${WEAVE_HOSTNAME:-0.0.0.0}"
+
+# Standalone self-update runtime contract (launcher -> server).
+export WEAVE_INSTALL_FLAVOR="standalone"
+export WEAVE_STANDALONE_CAN_SELF_UPDATE="1"
+export WEAVE_STANDALONE_INSTALL_DIR="$INSTALL_DIR"
+export WEAVE_STANDALONE_LAUNCHER_PATH="$SCRIPT_DIR/weave-fleet"
+export WEAVE_STANDALONE_PORT="$PORT"
+export WEAVE_STANDALONE_HOSTNAME="$HOSTNAME"
+export WEAVE_STANDALONE_PLATFORM="posix"
 
 # Ensure data directory exists
 mkdir -p "${HOME}/.weave"

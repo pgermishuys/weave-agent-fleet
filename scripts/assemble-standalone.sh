@@ -68,6 +68,12 @@ fi
 VERSION=$(node -e "console.log(require('./package.json').version)" 2>/dev/null || echo "0.0.0")
 echo "$VERSION" > "$STANDALONE_DIR/VERSION"
 
+# 6. Copy standalone update helper templates
+mkdir -p "$STANDALONE_DIR/scripts"
+cp "$PROJECT_ROOT/scripts/update-helper.sh" "$STANDALONE_DIR/scripts/update-helper.sh"
+cp "$PROJECT_ROOT/scripts/update-helper.ps1" "$STANDALONE_DIR/scripts/update-helper.ps1"
+chmod +x "$STANDALONE_DIR/scripts/update-helper.sh"
+
 echo "Assembly complete. Standalone directory is ready at: $STANDALONE_DIR"
 echo "  Version: $VERSION"
 echo "  Test with: node $STANDALONE_DIR/server.js"

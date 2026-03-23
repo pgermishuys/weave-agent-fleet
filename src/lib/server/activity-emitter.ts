@@ -12,6 +12,7 @@
 
 import { EventEmitter } from "events";
 import type { SessionActivityStatus } from "@/lib/types";
+import type { StandaloneUpdateEvent } from "@/lib/api-types";
 import { log } from "./logger";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -75,17 +76,38 @@ export function onTokenUpdate(
   };
 }
 
+// ─── Standalone update events (ephemeral — durable state lives on disk) ───────
+
+export function emitStandaloneUpdate(payload: StandaloneUpdateEvent): void {
+  getEmitter().emit("standalone_update", payload);
+}
+
+export function onStandaloneUpdate(
+  callback: (payload: StandaloneUpdateEvent) => void
+): () => void {
+  const emitter = getEmitter();
+  emitter.on("standalone_update", callback);
+  return () => {
+    emitter.off("standalone_update", callback);
+  };
+}
+
 // ─── Listener monitoring ──────────────────────────────────────────────────────
 
 const LISTENER_WARN_THRESHOLD = 50;
 const LISTENER_MONITOR_INTERVAL_MS = 60_000;
 
 /** Get current listener counts by event type. */
-export function getListenerCounts(): { activity_status: number; token_update: number } {
+export function getListenerCounts(): {
+  activity_status: number;
+  token_update: number;
+  standalone_update: number;
+} {
   const emitter = getEmitter();
   return {
     activity_status: emitter.listenerCount("activity_status"),
     token_update: emitter.listenerCount("token_update"),
+    standalone_update: emitter.listenerCount("standalone_update"),
   };
 }
 
@@ -98,12 +120,13 @@ export function startListenerMonitoring(): void {
   if (_g.__weaveActivityListenerMonitorInterval) return;
   _g.__weaveActivityListenerMonitorInterval = setInterval(() => {
     const counts = getListenerCounts();
-    const total = counts.activity_status + counts.token_update;
+    const total = counts.activity_status + counts.token_update + counts.standalone_update;
     if (total > LISTENER_WARN_THRESHOLD) {
       log.warn("activity-emitter", "High listener count — possible leak", {
         total,
         activityStatusListeners: counts.activity_status,
         tokenUpdateListeners: counts.token_update,
+        standaloneUpdateListeners: counts.standalone_update,
       });
     }
   }, LISTENER_MONITOR_INTERVAL_MS);

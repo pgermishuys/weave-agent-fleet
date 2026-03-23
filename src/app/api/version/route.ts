@@ -14,6 +14,8 @@ export async function GET(request: Request): Promise<NextResponse> {
       updateAvailable: info.updateAvailable,
       checkedAt: info.checkedAt?.toISOString() ?? null,
       channel,
+      installFlavor: info.installFlavor,
+      canSelfUpdate: info.canSelfUpdate,
     },
     { status: 200 }
   );

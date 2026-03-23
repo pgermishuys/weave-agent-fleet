@@ -4,11 +4,16 @@
 #
 # Environment variables:
 #   WEAVE_VERSION      — Install a specific version (e.g., "0.1.0"). Default: latest.
+#   WEAVE_UPDATE_CHANNEL — Update channel: stable|dev. Default: stable.
 #   WEAVE_INSTALL_DIR  — Installation directory. Default: ~/.weave/fleet
 set -e
 
 REPO="pgermishuys/weave-agent-fleet"
 INSTALL_DIR="${WEAVE_INSTALL_DIR:-$HOME/.weave/fleet}"
+UPDATE_CHANNEL="${WEAVE_UPDATE_CHANNEL:-stable}"
+RELEASE_TAG=""
+VERSION=""
+ASSET_NAME=""
 
 # --- Helpers ---
 
@@ -93,26 +98,56 @@ download_to_stdout() {
 
 # --- Detect version ---
 
-detect_version() {
-  if [ -n "${WEAVE_VERSION:-}" ]; then
+detect_release() {
+  case "$UPDATE_CHANNEL" in
+    stable|dev)
+      ;;
+    *)
+      error "Unsupported WEAVE_UPDATE_CHANNEL: ${UPDATE_CHANNEL}. Use stable or dev."
+      ;;
+  esac
+
+  if [ "$UPDATE_CHANNEL" = "stable" ] && [ -n "${WEAVE_VERSION:-}" ]; then
     VERSION="$WEAVE_VERSION"
-    info "Using specified version: v${VERSION}"
+    RELEASE_TAG="v${VERSION}"
+    ASSET_NAME="weave-fleet-v${VERSION}-${TARGET}.tar.gz"
+    info "Using specified stable version: ${RELEASE_TAG}"
     return
   fi
 
-  info "Fetching latest version..."
-  # Use GitHub API to get latest release tag
-  RELEASE_JSON="$(download_to_stdout "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null)" || \
-    error "Failed to fetch latest release from GitHub. Check your internet connection."
+  if [ "$UPDATE_CHANNEL" = "stable" ]; then
+    info "Fetching latest stable version..."
+    RELEASE_JSON="$(download_to_stdout "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null)" || \
+      error "Failed to fetch latest stable release from GitHub. Check your internet connection."
 
-  # Extract tag_name (e.g., "v0.1.0") — portable JSON parsing without jq
-  VERSION="$(printf '%s' "$RELEASE_JSON" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v\{0,1\}\([^"]*\)".*/\1/p' | head -1)"
+    VERSION="$(printf '%s' "$RELEASE_JSON" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v\{0,1\}\([^"]*\)".*/\1/p' | head -1)"
+    if [ -z "$VERSION" ]; then
+      error "Could not determine latest stable version from GitHub API."
+    fi
 
-  if [ -z "$VERSION" ]; then
-    error "Could not determine latest version from GitHub API."
+    RELEASE_TAG="v${VERSION}"
+    ASSET_NAME="weave-fleet-v${VERSION}-${TARGET}.tar.gz"
+    info "Latest stable version: ${RELEASE_TAG}"
+    return
   fi
 
-  info "Latest version: v${VERSION}"
+  info "Fetching latest dev release..."
+  RELEASE_JSON="$(download_to_stdout "https://api.github.com/repos/${REPO}/releases/tags/dev" 2>/dev/null)" || \
+    error "Failed to fetch dev release metadata from GitHub."
+
+  RELEASE_TAG="$(printf '%s' "$RELEASE_JSON" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+  [ -z "$RELEASE_TAG" ] && RELEASE_TAG="dev"
+  VERSION="${RELEASE_TAG#v}"
+
+  ASSET_NAME="$(printf '%s' "$RELEASE_JSON" | tr ',' '\n' | sed -n "s/.*\"name\"[[:space:]]*:[[:space:]]*\"\([^\"]*-${TARGET}\.tar\.gz\)\".*/\1/p" | head -1)"
+  if [ -z "$ASSET_NAME" ]; then
+    error "No dev standalone artifact found for ${TARGET}."
+  fi
+
+  VERSION="${ASSET_NAME#weave-fleet-v}"
+  VERSION="${VERSION%-${TARGET}.tar.gz}"
+
+  info "Using dev release: ${RELEASE_TAG}"
 }
 
 # --- Verify checksum ---
@@ -195,11 +230,11 @@ main() {
 
   detect_platform
   detect_downloader
-  detect_version
+  detect_release
 
-  TARBALL_NAME="weave-fleet-v${VERSION}-${TARGET}.tar.gz"
-  DOWNLOAD_URL="https://github.com/${REPO}/releases/download/v${VERSION}/${TARBALL_NAME}"
-  CHECKSUMS_URL="https://github.com/${REPO}/releases/download/v${VERSION}/checksums.txt"
+  TARBALL_NAME="$ASSET_NAME"
+  DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${RELEASE_TAG}/${TARBALL_NAME}"
+  CHECKSUMS_URL="https://github.com/${REPO}/releases/download/${RELEASE_TAG}/checksums.txt"
 
   # Create temp directory
   TMP_DIR="$(mktemp -d)"
@@ -217,9 +252,13 @@ main() {
     if [ -n "$EXPECTED_CHECKSUM" ]; then
       verify_checksum "$TMP_DIR/$TARBALL_NAME" "$EXPECTED_CHECKSUM"
       success "Checksum verified."
+    elif [ "$UPDATE_CHANNEL" = "dev" ]; then
+      error "Checksum for ${TARBALL_NAME} not found in checksums.txt for dev channel. Refusing unsigned install."
     else
       warn "Warning: Checksum for ${TARBALL_NAME} not found in checksums.txt. Skipping verification."
     fi
+  elif [ "$UPDATE_CHANNEL" = "dev" ]; then
+    error "Could not download checksums.txt for dev channel. Refusing unsigned install."
   else
     warn "Warning: Could not download checksums.txt. Skipping verification."
   fi
@@ -236,7 +275,8 @@ main() {
   tar xzf "$TMP_DIR/$TARBALL_NAME" -C "$TMP_DIR"
 
   # The tarball extracts to a named directory — move contents to install dir
-  EXTRACTED_DIR="$TMP_DIR/weave-fleet-v${VERSION}-${TARGET}"
+  EXTRACTED_BASENAME="${TARBALL_NAME%.tar.gz}"
+  EXTRACTED_DIR="$TMP_DIR/${EXTRACTED_BASENAME}"
   if [ -d "$EXTRACTED_DIR" ]; then
     cp -r "$EXTRACTED_DIR/." "$INSTALL_DIR/"
   else

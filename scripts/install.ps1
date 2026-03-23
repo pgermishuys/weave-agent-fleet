@@ -3,6 +3,7 @@
 #
 # Environment variables:
 #   WEAVE_VERSION      — Install a specific version (e.g., "0.1.0"). Default: latest.
+#   WEAVE_UPDATE_CHANNEL — Update channel: stable|dev. Default: stable.
 #   WEAVE_INSTALL_DIR  — Installation directory. Default: %LOCALAPPDATA%\weave\fleet
 
 $ErrorActionPreference = 'Stop'
@@ -10,6 +11,7 @@ $ErrorActionPreference = 'Stop'
 $Repo = "pgermishuys/weave-agent-fleet"
 $DefaultInstallDir = Join-Path $env:LOCALAPPDATA "weave\fleet"
 $InstallDir = if ($env:WEAVE_INSTALL_DIR) { $env:WEAVE_INSTALL_DIR } else { $DefaultInstallDir }
+$UpdateChannel = if ($env:WEAVE_UPDATE_CHANNEL) { $env:WEAVE_UPDATE_CHANNEL } else { "stable" }
 
 # --- Helpers ---
 
@@ -51,25 +53,56 @@ function Get-TargetArch {
 
 # --- Detect version ---
 
-function Get-LatestVersion {
-    if ($env:WEAVE_VERSION) {
-        Write-Info "Using specified version: v$($env:WEAVE_VERSION)"
-        return $env:WEAVE_VERSION
+function Resolve-Release {
+    if ($UpdateChannel -ne "stable" -and $UpdateChannel -ne "dev") {
+        Write-ErrorAndExit "Unsupported WEAVE_UPDATE_CHANNEL: $UpdateChannel. Use stable or dev."
     }
 
-    Write-Info "Fetching latest version..."
-    try {
-        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -UseBasicParsing
-        $tag = $release.tag_name
-        $version = $tag -replace '^v', ''
-        if (-not $version) {
-            Write-ErrorAndExit "Could not determine latest version from GitHub API."
+    if ($UpdateChannel -eq "stable" -and $env:WEAVE_VERSION) {
+        $version = $env:WEAVE_VERSION
+        return [PSCustomObject]@{
+            ReleaseTag = "v$version"
+            Version = $version
+            AssetName = "weave-fleet-v$version-windows-x64.zip"
+            Channel = "stable"
         }
-        Write-Info "Latest version: v$version"
-        return $version
+    }
+
+    try {
+        if ($UpdateChannel -eq "stable") {
+            Write-Info "Fetching latest stable version..."
+            $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -UseBasicParsing
+            $tag = $release.tag_name
+            $version = $tag -replace '^v', ''
+            if (-not $version) {
+                Write-ErrorAndExit "Could not determine latest stable version from GitHub API."
+            }
+
+            return [PSCustomObject]@{
+                ReleaseTag = $tag
+                Version = $version
+                AssetName = "weave-fleet-v$version-windows-x64.zip"
+                Channel = "stable"
+            }
+        }
+
+        Write-Info "Fetching latest dev release..."
+        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/tags/dev" -UseBasicParsing
+        $asset = $release.assets | Where-Object { $_.name -match '-windows-x64\.zip$' } | Select-Object -First 1
+        if (-not $asset) {
+            Write-ErrorAndExit "No dev standalone artifact found for windows-x64."
+        }
+
+        $assetVersion = $asset.name -replace '^weave-fleet-v', '' -replace '-windows-x64\.zip$', ''
+        return [PSCustomObject]@{
+            ReleaseTag = if ($release.tag_name) { $release.tag_name } else { 'dev' }
+            Version = $assetVersion
+            AssetName = $asset.name
+            Channel = "dev"
+        }
     }
     catch {
-        Write-ErrorAndExit "Failed to fetch latest release from GitHub. Check your internet connection.`n$($_.Exception.Message)"
+        Write-ErrorAndExit "Failed to fetch $UpdateChannel release from GitHub.`n$($_.Exception.Message)"
     }
 }
 
@@ -183,11 +216,12 @@ function Main {
 
     $arch = Get-TargetArch
     $target = "windows-$arch"
-    $version = Get-LatestVersion
+    $release = Resolve-Release
+    $version = $release.Version
 
-    $zipName = "weave-fleet-v$version-$target.zip"
-    $downloadUrl = "https://github.com/$Repo/releases/download/v$version/$zipName"
-    $checksumsUrl = "https://github.com/$Repo/releases/download/v$version/checksums.txt"
+    $zipName = $release.AssetName
+    $downloadUrl = "https://github.com/$Repo/releases/download/$($release.ReleaseTag)/$zipName"
+    $checksumsUrl = "https://github.com/$Repo/releases/download/$($release.ReleaseTag)/checksums.txt"
 
     # Create temp directory
     $tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) "weave-fleet-install-$([System.Guid]::NewGuid().ToString('N').Substring(0, 8))"
@@ -215,11 +249,17 @@ function Main {
                 Test-Checksum -FilePath $zipPath -ExpectedHash $expectedHash
                 Write-Success "Checksum verified."
             }
+            elseif ($UpdateChannel -eq "dev") {
+                Write-ErrorAndExit "Checksum for $zipName not found in checksums.txt for dev channel. Refusing unsigned install."
+            }
             else {
                 Write-Warn "Warning: Checksum for $zipName not found in checksums.txt. Skipping verification."
             }
         }
         catch [System.Net.WebException] {
+            if ($UpdateChannel -eq "dev") {
+                Write-ErrorAndExit "Could not download checksums.txt for dev channel. Refusing unsigned install."
+            }
             Write-Warn "Warning: Could not download checksums.txt. Skipping verification."
         }
 

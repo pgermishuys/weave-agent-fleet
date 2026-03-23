@@ -363,3 +363,76 @@ export interface HistoryResponse {
   sessions: HistorySession[];
   total: number;
 }
+
+// ─── Standalone Self-Update Types ───────────────────────────────────────────
+
+/** Runtime install flavor as reported by GET /api/version. */
+export type InstallFlavor = "standalone" | "tauri" | "web";
+export type UpdateChannel = "stable" | "dev";
+
+/**
+ * Durable standalone update lifecycle states from GET /api/update.
+ *
+ * - idle: no update in progress
+ * - scheduled: API accepted request and helper spawn is pending
+ * - stopping: server is preparing to exit for handoff
+ * - installing: detached helper is running installer
+ * - restarting: helper finished install and is relaunching server
+ * - completed: update succeeded on this install
+ * - failed: update failed; inspect `error`
+ */
+export type StandaloneUpdateLifecycleState =
+  | "idle"
+  | "scheduled"
+  | "stopping"
+  | "installing"
+  | "restarting"
+  | "completed"
+  | "failed";
+
+/** POST /api/update request body. */
+export interface StandaloneUpdateRequest {
+  channel: UpdateChannel;
+}
+
+/** GET /api/update durable state shape. */
+export interface StandaloneUpdateStatusResponse {
+  mode: "standalone";
+  state: StandaloneUpdateLifecycleState;
+  channel: UpdateChannel | null;
+  targetVersion: string | null;
+  currentVersion: string;
+  error: string | null;
+  startedAt: string | null;
+  updatedAt: string | null;
+  reconnectHint: string | null;
+}
+
+/**
+ * GET /api/version response shape.
+ *
+ * `installFlavor` + `canSelfUpdate` are the feature gate for browser-triggered
+ * standalone updates.
+ */
+export interface VersionResponse {
+  version: string;
+  latest: string | null;
+  updateAvailable: boolean;
+  checkedAt: string | null;
+  channel: UpdateChannel;
+  installFlavor: InstallFlavor;
+  canSelfUpdate: boolean;
+}
+
+/**
+ * `standalone_update` activity-stream event payload.
+ * Used for transient live updates while the server is still connected.
+ */
+export interface StandaloneUpdateEvent {
+  type: "standalone_update";
+  state: StandaloneUpdateLifecycleState;
+  channel: UpdateChannel | null;
+  message: string;
+  at: string;
+  error?: string;
+}

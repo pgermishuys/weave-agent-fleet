@@ -92,6 +92,12 @@ catch {
 }
 Set-Content -Path (Join-Path $StandaloneDir "VERSION") -Value $version -NoNewline
 
+# 6. Copy standalone update helper templates
+$scriptsDst = Join-Path $StandaloneDir "scripts"
+New-Item -ItemType Directory -Path $scriptsDst -Force | Out-Null
+Copy-Item -Path (Join-Path $ProjectRoot "scripts\update-helper.sh") -Destination (Join-Path $scriptsDst "update-helper.sh") -Force
+Copy-Item -Path (Join-Path $ProjectRoot "scripts\update-helper.ps1") -Destination (Join-Path $scriptsDst "update-helper.ps1") -Force
+
 Write-Host "Assembly complete. Standalone directory is ready at: $StandaloneDir"
 Write-Host "  Version: $version"
 Write-Host "  Test with: node $StandaloneDir\server.js"

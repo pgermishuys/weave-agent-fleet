@@ -1,6 +1,10 @@
 import { NextRequest } from "next/server";
 import { _recoveryComplete } from "@/lib/server/process-manager";
-import { onActivityStatus, onTokenUpdate } from "@/lib/server/activity-emitter";
+import {
+  onActivityStatus,
+  onStandaloneUpdate,
+  onTokenUpdate,
+} from "@/lib/server/activity-emitter";
 
 const KEEPALIVE_INTERVAL_MS = 15_000;
 
@@ -54,11 +58,18 @@ export async function GET(request: NextRequest): Promise<Response> {
         send({ type: "token_update", payload });
       });
 
+      // Subscribe to standalone self-update handoff events
+      const unsubscribeStandaloneUpdate = onStandaloneUpdate((payload) => {
+        if (abortController.signal.aborted) return;
+        send({ type: "standalone_update", payload });
+      });
+
       // Cleanup on abort
       abortController.signal.addEventListener("abort", () => {
         clearInterval(keepalive);
         unsubscribeActivity();
         unsubscribeTokens();
+        unsubscribeStandaloneUpdate();
         try {
           controller.close();
         } catch {

@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Loader2, FolderOpen, ExternalLink } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { Loader2, FolderOpen, ExternalLink, RefreshCw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -13,8 +14,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useConfig } from "@/hooks/use-config";
+import { useGlobalSSE } from "@/hooks/use-global-sse";
 import { apiFetch } from "@/lib/api-client";
+import { isTauri, tauriInvoke } from "@/lib/tauri";
 import { useUpdatePreferences } from "@/lib/update-preferences";
+import type {
+  StandaloneUpdateStatusResponse,
+  UpdateChannel,
+  VersionResponse,
+} from "@/lib/api-types";
 
 interface VersionInfo {
   version: string;
@@ -22,13 +30,57 @@ interface VersionInfo {
   updateAvailable: boolean;
   checkedAt: string | null;
   channel?: "stable" | "dev";
+  installFlavor?: "standalone" | "tauri" | "web";
+  canSelfUpdate?: boolean;
+}
+
+type UpdateState = "idle" | "scheduled" | "stopping" | "installing" | "restarting";
+
+function isUpdateInProgress(state: string): state is UpdateState {
+  return (
+    state === "scheduled" ||
+    state === "stopping" ||
+    state === "installing" ||
+    state === "restarting"
+  );
+}
+
+function formatStandaloneMessage(status: StandaloneUpdateStatusResponse): string {
+  switch (status.state) {
+    case "scheduled":
+      return `Standalone ${status.channel ?? "stable"} update scheduled.`;
+    case "stopping":
+      return "Stopping server for standalone update...";
+    case "installing":
+      return "Installing standalone update...";
+    case "restarting":
+      return "Restarting standalone server...";
+    case "completed":
+      return "Standalone update completed. Reloading...";
+    case "failed":
+      return status.error ?? "Standalone update failed.";
+    default:
+      return "";
+  }
+}
+
+function isLoopbackBrowserHost(hostname: string): boolean {
+  const normalized = hostname.trim().toLowerCase();
+  return normalized === "localhost" || normalized === "127.0.0.1" || normalized === "::1";
 }
 
 export function AboutTab() {
+  const tauri = isTauri();
+  const sse = useGlobalSSE();
+  const localBrowserSession =
+    typeof window !== "undefined" && isLoopbackBrowserHost(window.location.hostname);
   const { paths, isLoading: configLoading } = useConfig();
   const [updatePreferences, setUpdatePreferences] = useUpdatePreferences();
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
   const [versionLoading, setVersionLoading] = useState(true);
+  const [updatingChannel, setUpdatingChannel] = useState<UpdateChannel | null>(null);
+  const [updateMessage, setUpdateMessage] = useState<string | null>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
   useEffect(() => {
     setVersionLoading(true);
@@ -38,6 +90,127 @@ export function AboutTab() {
       .catch(() => {})
       .finally(() => setVersionLoading(false));
   }, [updatePreferences.channel]);
+
+  const loadVersionInfo = useCallback(async () => {
+    const response = await apiFetch(`/api/version?channel=${updatePreferences.channel}`);
+    const payload = (await response.json()) as VersionResponse;
+    setVersionInfo(payload);
+    return payload;
+  }, [updatePreferences.channel]);
+
+  const loadStandaloneStatus = useCallback(async () => {
+    const response = await apiFetch("/api/update");
+    if (!response.ok) {
+      return null;
+    }
+
+    const status = (await response.json()) as StandaloneUpdateStatusResponse;
+    if (status.state === "failed") {
+      setUpdateError(status.error ?? "Standalone update failed.");
+    } else {
+      setUpdateError(null);
+    }
+
+    const message = formatStandaloneMessage(status);
+    setUpdateMessage(message || null);
+
+    if (!isUpdateInProgress(status.state)) {
+      setUpdatingChannel(null);
+    }
+
+    if (status.state === "completed") {
+      const latestVersion = await loadVersionInfo().catch(() => null);
+      if (latestVersion) {
+        setTimeout(() => window.location.reload(), 500);
+      }
+    }
+
+    return status;
+  }, [loadVersionInfo]);
+
+  const handleForceUpdate = useCallback(async (channel: UpdateChannel) => {
+    setUpdateMessage(null);
+    setUpdateError(null);
+    setUpdatingChannel(channel);
+
+    try {
+      if (tauri) {
+        const available = await tauriInvoke<{ version: string; current_version: string } | null>(
+          "check_for_updates",
+        );
+
+        if (!available) {
+          setUpdateMessage(`No ${channel} update is currently available.`);
+          return;
+        }
+
+        setUpdateMessage(`Installing ${channel} v${available.version}...`);
+        await tauriInvoke("install_update");
+        return;
+      }
+
+      const response = await apiFetch("/api/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channel }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(payload?.error ?? "Failed to schedule standalone update.");
+      }
+
+      const status = (await response.json()) as StandaloneUpdateStatusResponse;
+      setUpdateMessage(formatStandaloneMessage(status));
+    } catch (error) {
+      setUpdateError(
+        error instanceof Error ? error.message : "Failed to start the update.",
+      );
+      setUpdatingChannel(null);
+    } finally {
+      if (tauri) {
+        setUpdatingChannel(null);
+      }
+    }
+  }, [tauri]);
+
+  useEffect(() => {
+    if (!versionInfo?.canSelfUpdate || versionInfo.installFlavor !== "standalone") {
+      return;
+    }
+
+    void loadStandaloneStatus();
+  }, [versionInfo?.canSelfUpdate, versionInfo?.installFlavor, loadStandaloneStatus]);
+
+  useEffect(() => {
+    const handler = (event: unknown) => {
+      const payload = (event as { payload?: { state?: string; message?: string } }).payload;
+      if (!payload?.state) return;
+      if (payload.message) {
+        setUpdateMessage(payload.message);
+      }
+      if (!isUpdateInProgress(payload.state)) {
+        setUpdatingChannel(null);
+      }
+    };
+
+    sse.on("standalone_update", handler);
+    return () => {
+      sse.off("standalone_update", handler);
+    };
+  }, [sse]);
+
+  useEffect(() => {
+    if (versionInfo?.installFlavor !== "standalone" || !versionInfo.canSelfUpdate) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      void loadStandaloneStatus();
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [versionInfo?.canSelfUpdate, versionInfo?.installFlavor, loadStandaloneStatus]);
 
   const isLoading = configLoading || versionLoading;
 
@@ -51,7 +224,6 @@ export function AboutTab() {
 
   return (
     <div className="space-y-6 max-w-xl">
-      {/* Version */}
       <Card>
         <CardContent className="p-4 space-y-3">
           <h4 className="text-sm font-semibold">Version</h4>
@@ -83,7 +255,6 @@ export function AboutTab() {
         </CardContent>
       </Card>
 
-      {/* Updates */}
       <Card>
         <CardContent className="p-4 space-y-4">
           <h4 className="text-sm font-semibold">Updates</h4>
@@ -135,11 +306,44 @@ export function AboutTab() {
               Mode: {updatePreferences.autoUpdate ? "auto-download" : "manual"} ·
               Channel: {updatePreferences.channel}
             </div>
+
+            {(tauri ||
+              (versionInfo?.installFlavor === "standalone" && versionInfo.canSelfUpdate)) && (
+              <div className="space-y-2">
+                <p className="text-sm">Force Update</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    onClick={() => void handleForceUpdate(updatePreferences.channel)}
+                    disabled={updatingChannel !== null || (!tauri && !localBrowserSession)}
+                    className="gap-1.5"
+                  >
+                    {updatingChannel === updatePreferences.channel ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    )}
+                    Force update {updatePreferences.channel}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {tauri
+                    ? "Immediately checks the selected channel and installs the latest available build."
+                    : localBrowserSession
+                      ? "Schedules a standalone self-update, restarts the server, then reconnects this browser session."
+                      : "Available only from a local browser session on this machine."}
+                </p>
+                {updateMessage && (
+                  <p className="text-xs text-muted-foreground">{updateMessage}</p>
+                )}
+                {updateError && (
+                  <p className="text-xs text-red-600 dark:text-red-400">{updateError}</p>
+                )}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Config Paths */}
       <Card>
         <CardContent className="p-4 space-y-3">
           <h4 className="text-sm font-semibold">Configuration Files</h4>
@@ -166,7 +370,6 @@ export function AboutTab() {
         </CardContent>
       </Card>
 
-      {/* Links */}
       <Card>
         <CardContent className="p-4 space-y-3">
           <h4 className="text-sm font-semibold">Links</h4>

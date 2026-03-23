@@ -1,0 +1,14 @@
+- `UpdatePreferences` now flow from client localStorage (`useUpdatePreferences`) into Rust via `set_update_preferences` on dialog mount/update.
+- Rust updater state is now modeled explicitly via `PendingUpdateState` + `UpdateStatePayload` to expose `update_available`, `download_in_progress`, and `update_ready_for_restart`.
+- Channel changes now clear pending/staged/download flags in Rust state to avoid stale cross-channel update state.
+- Updater flow now has explicit Rust commands for check (`check_for_updates`), staged download (`download_update`), and apply (`apply_staged_update`) with startup auto-apply.
+- Staged update bytes/metadata are persisted in app data (`staged-update.bin` and `staged-update.json`) to support next-launch install behavior.
+- About settings now expose persisted `autoUpdate` and `channel` controls using `useUpdatePreferences`, so the channel/mode are visible and adjustable in-app.
+- The desktop update dialog now supports an auto-download path and a distinct `ready` state with next-start messaging instead of forcing immediate install for auto mode.
+- `scripts/tauri-prebuild.mjs` now accepts `WEAVE_UPDATE_CHANNEL` and stamps both Tauri version and updater endpoint for stable/dev packaging.
+- New scripts in `package.json` (`tauri:build:stable` and `tauri:build:dev`) provide explicit maintainers commands for channel-specific package output.
+- Added `.github/workflows/dev-channel.yml` to publish signed dev installers/updater metadata on `push` to `main` under rolling `dev` prerelease tag.
+- `RELEASE.md` now documents stable vs dev channels, local stable/dev build commands, required publishing secrets, and dev verification steps.
+- Rust now uses `updater_builder().endpoints(...)` per selected channel, so runtime channel changes affect actual updater metadata checks instead of only UI state.
+- Channel policy is now tested in Rust: `stable -> dev` accepts same-core prereleases, and `dev -> stable` accepts same-core stable releases while rejecting older stable versions.
+- `/api/version` now accepts `?channel=stable|dev` and fetches dev latest version from the rolling `dev/latest.json` updater metadata.

@@ -1,5 +1,6 @@
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
+import { getInstallRuntimeMetadata, type InstallFlavor } from "@/lib/server/standalone-update-state";
 
 const GITHUB_RELEASES_URL =
   "https://api.github.com/repos/pgermishuys/weave-agent-fleet/releases/latest";
@@ -15,6 +16,8 @@ export interface VersionInfo {
   latest: string | null;
   updateAvailable: boolean;
   checkedAt: Date | null;
+  installFlavor: InstallFlavor;
+  canSelfUpdate: boolean;
 }
 
 const cachedVersionInfoByChannel = new Map<UpdateChannel, VersionInfo>();
@@ -162,10 +165,18 @@ async function fetchDevLatestVersion(): Promise<string | null> {
  * Never blocks — returns immediately if a check is already in progress.
  */
 export async function getVersionInfo(channel: UpdateChannel = "stable"): Promise<VersionInfo> {
+  const runtime = getInstallRuntimeMetadata();
   const current = getCurrentVersion();
 
   if (!current) {
-    return { current: "dev", latest: null, updateAvailable: false, checkedAt: null };
+    return {
+      current: "dev",
+      latest: null,
+      updateAvailable: false,
+      checkedAt: null,
+      installFlavor: runtime.installFlavor,
+      canSelfUpdate: runtime.canSelfUpdate,
+    };
   }
 
   const now = Date.now();
@@ -184,6 +195,8 @@ export async function getVersionInfo(channel: UpdateChannel = "stable"): Promise
     latest,
     updateAvailable: latest !== null && isNewer(current, latest, channel),
     checkedAt: new Date(),
+    installFlavor: runtime.installFlavor,
+    canSelfUpdate: runtime.canSelfUpdate,
   };
 
   cachedVersionInfoByChannel.set(channel, info);

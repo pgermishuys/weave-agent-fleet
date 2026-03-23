@@ -63,7 +63,8 @@ exit /b 0
 
 :do_update
 echo Updating Weave Fleet...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://github.com/pgermishuys/weave-agent-fleet/releases/latest/download/install.ps1 | iex"
+if not defined WEAVE_UPDATE_CHANNEL set "WEAVE_UPDATE_CHANNEL=stable"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$env:WEAVE_UPDATE_CHANNEL='%WEAVE_UPDATE_CHANNEL%'; irm https://github.com/pgermishuys/weave-agent-fleet/releases/latest/download/install.ps1 | iex"
 exit /b %ERRORLEVEL%
 
 :do_uninstall
@@ -111,6 +112,7 @@ echo.
 echo Environment variables:
 echo   PORT             Server port (default: 3000)
 echo   WEAVE_HOSTNAME   Server bind address (default: 0.0.0.0)
+echo   WEAVE_UPDATE_CHANNEL Update channel for 'update' (stable^|dev)
 echo   WEAVE_DB_PATH    Database file path (default: %%USERPROFILE%%\.weave\fleet.db)
 echo   OPENCODE_BIN     Full path to opencode binary (if not on PATH)
 exit /b 0
@@ -170,6 +172,15 @@ if defined WEAVE_HOSTNAME (
 ) else (
     set "HOSTNAME=0.0.0.0"
 )
+
+rem Standalone self-update runtime contract (launcher -> server)
+set "WEAVE_INSTALL_FLAVOR=standalone"
+set "WEAVE_STANDALONE_CAN_SELF_UPDATE=1"
+set "WEAVE_STANDALONE_INSTALL_DIR=%INSTALL_DIR%"
+set "WEAVE_STANDALONE_LAUNCHER_PATH=%~f0"
+set "WEAVE_STANDALONE_PORT=%PORT%"
+set "WEAVE_STANDALONE_HOSTNAME=%HOSTNAME%"
+set "WEAVE_STANDALONE_PLATFORM=windows"
 
 rem Ensure data directory exists
 if not exist "%USERPROFILE%\.weave" mkdir "%USERPROFILE%\.weave"
