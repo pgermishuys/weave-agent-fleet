@@ -20,7 +20,7 @@
     "tauri:build:dev": "WEAVE_UPDATE_CHANNEL=dev node scripts/tauri-prebuild.mjs && npx tauri build"
   },
   "dependencies": {
-    "@opencode-ai/sdk": "^1.2.24",
+    "@opencode-ai/sdk": "^1.3.0",
     "@tauri-apps/api": "^2.10.1",
     "better-sqlite3": "^12.8.0",
     "class-variance-authority": "^0.7.1",
