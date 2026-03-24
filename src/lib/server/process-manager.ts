@@ -14,7 +14,7 @@
 
 import { createOpencodeClient, type OpencodeClient } from "@opencode-ai/sdk/v2";
 import { spawn, spawnSync } from "child_process";
-import { existsSync, statSync } from "fs";
+import { existsSync, statSync, readdirSync } from "fs";
 import { homedir } from "os";
 import { createServer, Socket } from "net";
 import { dirname, resolve, sep } from "path";
@@ -294,9 +294,34 @@ export const _recoveryComplete: Promise<void> = _g.__weaveRecoveryPromise!;
 let _cleanupRun: boolean = (_g.__weaveCleanupRun ??= false);
 
 /**
- * Returns workspace roots defined by the ORCHESTRATOR_WORKSPACE_ROOTS env var
- * (or the user's home directory as default). These are "system" roots that
- * cannot be removed via the UI.
+ * Discover filesystem root directories. On Windows this returns available
+ * drive letters (e.g. ["C:\\", "D:\\"]), on Unix/macOS it returns ["/"].
+ */
+function getFilesystemRoots(): string[] {
+  if (process.platform === "win32") {
+    // Enumerate drive letters A-Z; keep those that exist and are accessible.
+    const drives: string[] = [];
+    for (let code = 65; code <= 90; code++) {
+      const drive = `${String.fromCharCode(code)}:\\`;
+      try {
+        // readdirSync will throw if the drive doesn't exist or isn't ready
+        readdirSync(drive);
+        drives.push(drive);
+      } catch {
+        // Drive doesn't exist or isn't ready (e.g. empty CD-ROM drive)
+      }
+    }
+    // Fallback: if no drives were found (shouldn't happen), use homedir
+    return drives.length > 0 ? drives : [resolve(homedir())];
+  }
+  return ["/"];
+}
+
+/**
+ * Returns workspace roots defined by the ORCHESTRATOR_WORKSPACE_ROOTS env var.
+ * When the env var is not set, defaults to the filesystem roots (drive letters
+ * on Windows, "/" on Unix) so the directory picker can navigate the full
+ * filesystem. These are "system" roots that cannot be removed via the UI.
  */
 export function getEnvRoots(): string[] {
   const envRoots = process.env.ORCHESTRATOR_WORKSPACE_ROOTS;
@@ -304,7 +329,7 @@ export function getEnvRoots(): string[] {
     const separator = process.platform === "win32" ? ";" : ":";
     return envRoots.split(separator).map((r) => resolve(r.trim())).filter(Boolean);
   }
-  return [resolve(homedir())];
+  return getFilesystemRoots();
 }
 
 /**
@@ -355,7 +380,9 @@ export function validateDirectory(directory: string): string {
 
   const roots = getAllowedRoots();
   const underAllowedRoot = roots.some(
-    (root) => resolved === root || resolved.startsWith(root + sep)
+    (root) =>
+      resolved === root ||
+      resolved.startsWith(root.endsWith(sep) ? root : root + sep)
   );
   if (!underAllowedRoot) {
     throw new Error("Directory is outside the allowed workspace roots");

@@ -36,7 +36,9 @@ const MAX_ENTRIES = 100;
  */
 function isUnderAllowedRoot(realPath: string, roots: string[]): boolean {
   return roots.some(
-    (root) => realPath === root || realPath.startsWith(root + sep)
+    (root) =>
+      realPath === root ||
+      realPath.startsWith(root.endsWith(sep) ? root : root + sep)
   );
 }
 
@@ -60,7 +62,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         }
       })
       .map((root) => ({
-        name: root.split(sep).pop() ?? root,
+        name: root.split(sep).filter(Boolean).pop() ?? root,
         path: root,
         isGitRepo: existsSync(join(root, ".git")),
       }));

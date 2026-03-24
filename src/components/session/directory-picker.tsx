@@ -93,14 +93,17 @@ export function DirectoryPicker({
   const breadcrumbs = React.useMemo(() => {
     if (currentPath === null) return [];
 
+    // Normalize separators: server may return "\" on Windows
+    const sep = currentPath.includes("\\") ? "\\" : "/";
+
     // Find which root this path is under
     const root = roots.find(
-      (r) => currentPath === r || currentPath.startsWith(r + "/")
+      (r) => currentPath === r || currentPath.startsWith(r + sep)
     );
 
     if (!root) return [{ label: currentPath, path: currentPath }];
 
-    const rootName = root.split("/").pop() ?? root;
+    const rootName = root.split(sep).filter(Boolean).pop() ?? root;
     const crumbs: { label: string; path: string }[] = [
       { label: rootName, path: root },
     ];
@@ -108,10 +111,10 @@ export function DirectoryPicker({
     // Add segments between root and current path
     if (currentPath !== root) {
       const relative = currentPath.slice(root.length + 1);
-      const segments = relative.split("/");
+      const segments = relative.split(sep);
       let accumulated = root;
       for (const segment of segments) {
-        accumulated = `${accumulated}/${segment}`;
+        accumulated = `${accumulated}${sep}${segment}`;
         crumbs.push({ label: segment, path: accumulated });
       }
     }

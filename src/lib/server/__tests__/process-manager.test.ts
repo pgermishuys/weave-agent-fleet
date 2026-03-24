@@ -191,18 +191,19 @@ describe("validateDirectory", () => {
     );
   });
 
-  it("DefaultsToHomedirWhenEnvVarIsUnset", () => {
-    // ORCHESTRATOR_WORKSPACE_ROOTS is not set — defaults to homedir()
+  it("DefaultsToFilesystemRootsWhenEnvVarIsUnset", () => {
+    // ORCHESTRATOR_WORKSPACE_ROOTS is not set — defaults to filesystem roots
+    // On any platform, the home directory should be under one of the roots
     const home = homedir();
     const result = validateDirectory(home);
     expect(result).toBe(resolve(home));
   });
 
-  it("ThrowsForPathOutsideHomedirWhenEnvVarIsUnset", () => {
-    // /tmp is not under homedir() when env var is unset
-    expect(() => validateDirectory("/tmp")).toThrow(
-      "Directory is outside the allowed workspace roots"
-    );
+  it("AllowsAnyAbsolutePathWhenEnvVarIsUnset", () => {
+    // When env var is unset, filesystem roots are the boundary, so /tmp
+    // (or any existing absolute path) should be accessible
+    const result = validateDirectory("/tmp");
+    expect(result).toBe(resolve("/tmp"));
   });
 
   it("ReturnsResolvedAbsolutePathNotRawInput", () => {
@@ -267,9 +268,18 @@ describe("getEnvRoots", () => {
     expect(roots).toEqual([resolve("/tmp"), resolve("/var")]);
   });
 
-  it("ReturnsHomedirWhenEnvVarIsUnset", () => {
+  it("ReturnsFilesystemRootsWhenEnvVarIsUnset", () => {
     const roots = getEnvRoots();
-    expect(roots).toEqual([resolve(homedir())]);
+    // On Unix/macOS should be ["/"], on Windows should be drive letters
+    if (process.platform === "win32") {
+      expect(roots.length).toBeGreaterThan(0);
+      // Every root should be a drive letter path (e.g. "C:\\")
+      for (const root of roots) {
+        expect(root).toMatch(/^[A-Z]:\\$/);
+      }
+    } else {
+      expect(roots).toEqual(["/"]);
+    }
   });
 });
 
