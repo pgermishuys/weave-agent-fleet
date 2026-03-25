@@ -48,7 +48,8 @@ function getWeaveWorkspaceRoot(): string {
 
 /**
  * Scan all configured workspace roots for immediate-child git repositories.
- * A directory is considered a git repo if it contains a `.git` entry.
+ * A directory is considered a git repo if it contains a `.git` directory.
+ * Directories with a `.git` file (git worktrees) are excluded.
  */
 export function scanWorkspaceRoots(): ScannedRepository[] {
   const roots = getAllowedRoots();
@@ -76,7 +77,7 @@ export function scanWorkspaceRoots(): ScannedRepository[] {
       const gitPath = join(fullPath, ".git");
 
       try {
-        if (existsSync(gitPath)) {
+        if (statSync(gitPath).isDirectory()) {
           results.push({
             name: entry.name,
             path: fullPath,
@@ -84,7 +85,7 @@ export function scanWorkspaceRoots(): ScannedRepository[] {
           });
         }
       } catch {
-        // Skip entries that error during stat
+        // Skip entries that error during stat (including ENOENT when .git doesn't exist)
       }
     }
   }
