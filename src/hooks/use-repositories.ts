@@ -24,6 +24,21 @@ export function groupByRoot(repos: ScannedRepository[]): Map<string, ScannedRepo
   return map;
 }
 
+// ─── Cross-instance notification ──────────────────────────────────────────────
+
+/**
+ * Singleton event target shared by all useRepositories instances.
+ * When any instance completes a refresh, it broadcasts the latest data
+ * so every other mounted instance updates without re-fetching.
+ */
+const reposBus = new EventTarget();
+
+function broadcastReposUpdate(data: RepositoryScanResponse) {
+  reposBus.dispatchEvent(
+    new CustomEvent("repos-updated", { detail: data })
+  );
+}
+
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 interface UseRepositoriesResult {
@@ -40,6 +55,11 @@ export function useRepositories(): UseRepositoriesResult {
   const [error, setError] = useState<string | null>(null);
   const [scannedAt, setScannedAt] = useState<number | null>(null);
 
+  const applyData = useCallback((data: RepositoryScanResponse) => {
+    setRepositories(data.repositories);
+    setScannedAt(data.scannedAt);
+  }, []);
+
   const loadRepositories = useCallback(async (endpoint: string) => {
     setIsLoading(true);
     setError(null);
@@ -52,18 +72,30 @@ export function useRepositories(): UseRepositoriesResult {
         throw new Error(data.error ?? "Failed to load repositories");
       }
       const data: RepositoryScanResponse = await res.json();
-      setRepositories(data.repositories);
-      setScannedAt(data.scannedAt);
+      applyData(data);
+      // Notify other mounted useRepositories instances
+      broadcastReposUpdate(data);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [applyData]);
 
+  // Initial load (cached)
   useEffect(() => {
     void loadRepositories("/api/repositories");
   }, [loadRepositories]);
+
+  // Listen for broadcasts from other instances (e.g., Settings triggers refresh)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const data = (e as CustomEvent<RepositoryScanResponse>).detail;
+      applyData(data);
+    };
+    reposBus.addEventListener("repos-updated", handler);
+    return () => reposBus.removeEventListener("repos-updated", handler);
+  }, [applyData]);
 
   const refresh = useCallback(async () => {
     await loadRepositories("/api/repositories/refresh");
