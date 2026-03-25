@@ -61,6 +61,29 @@ export interface BookmarkedRepo {
   name: string;
 }
 
+export interface GitHubCheckSuite {
+  id: number;
+  status: "queued" | "in_progress" | "completed";
+  conclusion: "success" | "failure" | "neutral" | "cancelled" | "skipped" | "timed_out" | "action_required" | null;
+}
+
+export interface GitHubCheckSuitesResponse {
+  total_count: number;
+  check_suites: GitHubCheckSuite[];
+}
+
+/** Combined PR + checks status for the sidebar polling endpoint. */
+export interface PrStatusResponse {
+  number: number;
+  title: string;
+  state: "open" | "closed";
+  merged: boolean;
+  draft: boolean;
+  checksStatus: "pending" | "running" | "success" | "failure" | "none";
+  headRef: string;
+  url: string;
+}
+
 /** Lean repo shape for in-memory cache — subset of GitHubRepo */
 export interface CachedGitHubRepo {
   id: number;

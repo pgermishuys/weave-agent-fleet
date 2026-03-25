@@ -25,6 +25,10 @@ import { ConfirmDeleteSessionDialog } from "@/components/fleet/confirm-delete-se
 import { ForkSessionDialog } from "@/components/session/fork-session-dialog";
 import { extractLatestTodos } from "@/lib/todo-utils";
 import { TodoSidebarPanel } from "@/components/session/todo-sidebar-panel";
+import { extractPrReferences } from "@/lib/pr-utils";
+import { PrSidebarPanel } from "@/components/session/pr-sidebar-panel";
+import { usePrStatus } from "@/hooks/use-pr-status";
+import { sessionCache } from "@/lib/session-cache";
 import { DiffViewer } from "@/components/session/diff-viewer";
 import { TokenCostBreakdown } from "@/components/session/token-cost-breakdown";
 import { useCommandRegistry } from "@/contexts/command-registry-context";
@@ -371,6 +375,33 @@ export default function SessionDetailPage() {
     [messages]
   );
   const latestTodos = useMemo(() => extractLatestTodos(messages), [messages]);
+
+  // PR detection: merge message-extracted PRs with cached PRs so that PRs
+  // created early in a long session survive message pagination/trimming.
+  const messagesPrs = useMemo(() => extractPrReferences(messages), [messages]);
+  const detectedPrs = useMemo(() => {
+    const cachedPrs = sessionCache.getPrReferences(sessionId, instanceId);
+    if (!cachedPrs || cachedPrs.length === 0) return messagesPrs;
+    // Merge: cached first (preserves order), then any new from messages
+    const seen = new Set(cachedPrs.map((pr) => pr.url));
+    const merged = [...cachedPrs];
+    for (const pr of messagesPrs) {
+      if (!seen.has(pr.url)) {
+        seen.add(pr.url);
+        merged.push(pr);
+      }
+    }
+    return merged;
+  }, [messagesPrs, sessionId, instanceId]);
+
+  // Persist detected PRs to the session cache whenever they change
+  useEffect(() => {
+    if (detectedPrs.length > 0) {
+      sessionCache.patchPrReferences(sessionId, instanceId, detectedPrs);
+    }
+  }, [detectedPrs, sessionId, instanceId]);
+
+  const { statuses: prStatuses } = usePrStatus(detectedPrs);
 
   // Register toggle-todo-panel command (depends on latestTodos)
   useEffect(() => {
@@ -857,6 +888,14 @@ export default function SessionDetailPage() {
                 <>
                   <Separator />
                   <TodoSidebarPanel todos={latestTodos} />
+                </>
+              )}
+
+              {/* Pull Requests — shown when agent has created PRs in this session */}
+              {detectedPrs.length > 0 && (
+                <>
+                  <Separator />
+                  <PrSidebarPanel prs={detectedPrs} statuses={prStatuses} />
                 </>
               )}
             </div>

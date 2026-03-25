@@ -7,6 +7,7 @@
  */
 
 import type { AccumulatedMessage } from "@/lib/api-types";
+import type { PrReference } from "@/lib/pr-utils";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -39,6 +40,8 @@ export interface CacheEntry {
   timestamp: number;
   /** Pagination state snapshot — restored to avoid incorrect "scroll up for older" state. */
   pagination: PaginationSnapshot;
+  /** PR references detected in the session — persisted so they survive message pagination/trimming. */
+  prReferences?: PrReference[];
 }
 
 // ─── LRU Cache implementation ─────────────────────────────────────────────
@@ -96,5 +99,50 @@ function clear(): void {
   _store.clear();
 }
 
+/**
+ * Patch just the PR references on an existing cache entry without touching
+ * other fields or LRU ordering. If no entry exists yet, stores them in a
+ * separate side-map so they can be merged when a full entry is later created.
+ */
+const _pendingPrs = new Map<string, PrReference[]>();
+
+function patchPrReferences(sessionId: string, instanceId: string, prs: PrReference[]): void {
+  const key = buildKey(sessionId, instanceId);
+  const entry = _store.get(key);
+  if (entry) {
+    entry.prReferences = prs;
+  } else {
+    // No full cache entry yet — stash for later merge
+    _pendingPrs.set(key, prs);
+  }
+}
+
+function getPrReferences(sessionId: string, instanceId: string): PrReference[] | undefined {
+  const key = buildKey(sessionId, instanceId);
+  const entry = _store.get(key);
+  if (entry?.prReferences) return entry.prReferences;
+  return _pendingPrs.get(key);
+}
+
+// Merge pending PRs into a full entry when it's created via set()
+const _originalSet = set;
+function setWithPrMerge(sessionId: string, instanceId: string, entry: CacheEntry): void {
+  const key = buildKey(sessionId, instanceId);
+  // If there are pending PR references and the entry doesn't already have them, merge
+  const pending = _pendingPrs.get(key);
+  if (pending && !entry.prReferences) {
+    entry.prReferences = pending;
+  }
+  _pendingPrs.delete(key);
+  _originalSet(sessionId, instanceId, entry);
+}
+
 /** Singleton cache object — import and use directly. */
-export const sessionCache = { get, set, delete: del, clear } as const;
+export const sessionCache = {
+  get,
+  set: setWithPrMerge,
+  delete: del,
+  clear,
+  patchPrReferences,
+  getPrReferences,
+} as const;
