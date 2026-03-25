@@ -9,6 +9,7 @@ import type { Components } from "react-markdown";
 import type { ClassAttributes, HTMLAttributes } from "react";
 import type { ExtraProps } from "react-markdown";
 import { extractLanguage, extractText } from "@/lib/markdown-utils";
+import { SlashCommandCode } from "./slash-command-code";
 
 // ─── highlight.js dark theme ──────────────────────────────────────────────────
 // Imported here so Next.js bundles it alongside the component.
@@ -184,11 +185,7 @@ const MARKDOWN_COMPONENTS: Components = {
         </code>
       );
     }
-    return (
-      <code className="bg-muted/50 text-primary/90 px-1 py-0.5 rounded text-xs font-mono">
-        {children}
-      </code>
-    );
+    return <SlashCommandCode className={className} {...props}>{children}</SlashCommandCode>;
   },
 
   // Fenced code blocks

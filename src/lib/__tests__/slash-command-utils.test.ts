@@ -1,4 +1,4 @@
-import { parseSlashCommand, isSlashCommand } from "@/lib/slash-command-utils";
+import { parseSlashCommand, isSlashCommand, extractSlashCommandText } from "@/lib/slash-command-utils";
 
 // ─── parseSlashCommand ────────────────────────────────────────────────────────
 
@@ -82,5 +82,51 @@ describe("isSlashCommand", () => {
 
   it("ReturnsFalseForTextStartingWithNonSlash", () => {
     expect(isSlashCommand("hello /world")).toBe(false);
+  });
+});
+
+// ─── extractSlashCommandText ──────────────────────────────────────────────────
+
+describe("extractSlashCommandText", () => {
+  it("ReturnsCommandForSimpleStringChild", () => {
+    expect(extractSlashCommandText("/start-work")).toBe("/start-work");
+  });
+
+  it("ReturnsCommandWithArgsForStringChild", () => {
+    expect(extractSlashCommandText("/compact arg1 arg2")).toBe("/compact arg1 arg2");
+  });
+
+  it("ReturnsNullForNonSlashText", () => {
+    expect(extractSlashCommandText("some code")).toBeNull();
+  });
+
+  it("ReturnsNullForEmptyString", () => {
+    expect(extractSlashCommandText("")).toBeNull();
+  });
+
+  it("ReturnsNullForBareSlash", () => {
+    expect(extractSlashCommandText("/")).toBeNull();
+  });
+
+  it("ReturnsCommandForArrayOfStringNodes", () => {
+    // React children can be arrays — concatenation should still yield a valid command
+    expect(extractSlashCommandText(["/start", "-work"])).toBe("/start-work");
+  });
+
+  it("ReturnsNullForProseContainingSlashCommand", () => {
+    // Guards against "run /start-work now" being considered a command
+    expect(extractSlashCommandText("run /start-work now")).toBeNull();
+  });
+
+  it("ReturnsNullForNull", () => {
+    expect(extractSlashCommandText(null)).toBeNull();
+  });
+
+  it("ReturnsNullForUndefined", () => {
+    expect(extractSlashCommandText(undefined)).toBeNull();
+  });
+
+  it("TrimsWhitespaceAroundValidCommand", () => {
+    expect(extractSlashCommandText("  /start-work  ")).toBe("/start-work");
   });
 });

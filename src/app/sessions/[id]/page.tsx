@@ -30,6 +30,7 @@ import { TokenCostBreakdown } from "@/components/session/token-cost-breakdown";
 import { useCommandRegistry } from "@/contexts/command-registry-context";
 import { useKeybindings } from "@/contexts/keybindings-context";
 import { useSessionsContext } from "@/contexts/sessions-context";
+import { SlashCommandProvider } from "@/contexts/slash-command-context";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import type { SelectedModel } from "@/components/session/model-selector";
 import type { ImageAttachment } from "@/lib/api-types";
@@ -663,25 +664,31 @@ export default function SessionDetailPage() {
             </TabsList>
             <TabsContent value="activity" className="flex-1 overflow-hidden flex flex-col">
               <div className="flex-1 overflow-hidden">
-                <ActivityStreamV1
-                  messages={messages}
-                  status={status}
-                  sessionStatus={sessionStatus}
-                  error={error}
-                  agents={agents}
-                  onReconnect={reconnect}
-                  reconnectAttempt={reconnectAttempt}
-                  hasMoreMessages={hasMoreMessages}
-                  isLoadingOlder={isLoadingOlder}
-                  onLoadOlder={loadOlderMessages}
-                  totalMessageCount={totalMessageCount}
-                  loadOlderError={loadOlderError}
-                  currentSessionId={sessionId}
-                  scrollPositionRef={scrollPositionRef}
-                  cacheHit={cacheHit}
-                  initialScrollPosition={initialScrollPosition}
-                  suppressAutoScrollRef={suppressAutoScrollRef}
-                />
+                <SlashCommandProvider
+                  sessionId={sessionId}
+                  instanceId={instanceId}
+                  disabled={isStopped || isResumable || status === "error"}
+                >
+                  <ActivityStreamV1
+                    messages={messages}
+                    status={status}
+                    sessionStatus={sessionStatus}
+                    error={error}
+                    agents={agents}
+                    onReconnect={reconnect}
+                    reconnectAttempt={reconnectAttempt}
+                    hasMoreMessages={hasMoreMessages}
+                    isLoadingOlder={isLoadingOlder}
+                    onLoadOlder={loadOlderMessages}
+                    totalMessageCount={totalMessageCount}
+                    loadOlderError={loadOlderError}
+                    currentSessionId={sessionId}
+                    scrollPositionRef={scrollPositionRef}
+                    cacheHit={cacheHit}
+                    initialScrollPosition={initialScrollPosition}
+                    suppressAutoScrollRef={suppressAutoScrollRef}
+                  />
+                </SlashCommandProvider>
               </div>
               <PromptInput
                 sessionId={sessionId}

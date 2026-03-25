@@ -3,6 +3,8 @@
  * Used to detect and parse /command-style input before routing to the SDK command API.
  */
 
+import { extractText } from "./markdown-utils";
+
 export interface ParsedSlashCommand {
   /** The command name without the leading slash, e.g. "metrics" */
   command: string;
@@ -44,4 +46,26 @@ export function parseSlashCommand(text: string): ParsedSlashCommand | null {
  */
 export function isSlashCommand(text: string): boolean {
   return text.trimStart().startsWith("/");
+}
+
+/**
+ * Extracts the slash command text from a React node (e.g. the children of an
+ * inline `<code>` element).  Returns the trimmed slash command string (e.g.
+ * `"/start-work"` or `"/compact arg1 arg2"`) if the node's text content is
+ * exactly a valid slash command, or `null` otherwise.
+ *
+ * Uses `extractText` from markdown-utils to recursively flatten React node trees
+ * to a plain string before parsing.
+ */
+export function extractSlashCommandText(children: unknown): string | null {
+  const text = extractText(children).trim();
+  if (!text) return null;
+  const parsed = parseSlashCommand(text);
+  if (!parsed) return null;
+  // Rebuild the full command string (slash + command + optional args)
+  const full = parsed.args ? `/${parsed.command} ${parsed.args}` : `/${parsed.command}`;
+  // Only return if the original text matches the reconstructed command exactly
+  // (guards against prose like "run /start-work now" slipping through)
+  if (text !== full) return null;
+  return full;
 }
