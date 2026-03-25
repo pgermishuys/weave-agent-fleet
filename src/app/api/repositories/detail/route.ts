@@ -13,9 +13,23 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   // Sanitize: resolve to canonical form and verify against allowlist (CWE-22).
+  // The for-loop + direct startsWith() is required so CodeQL recognises the
+  // StartsWithDirSanitizer barrier guard (callbacks like Array.some are not recognised).
   const safePath = resolve(inputPath);
   const roots = getAllowedRoots();
-  if (!roots.some((root) => safePath === root || safePath.startsWith(root + sep))) {
+  let matchedRoot: string | undefined;
+  for (const root of roots) {
+    if (safePath === root || safePath.startsWith(root + sep)) {
+      matchedRoot = root;
+      break;
+    }
+  }
+  if (!matchedRoot) {
+    return NextResponse.json({ error: "Path is outside the allowed workspace roots" }, { status: 400 });
+  }
+  // Re-assert prefix with the matched root so CodeQL sees a direct startsWith guard
+  // over the code that follows (StartsWithDirSanitizer requires this pattern).
+  if (!safePath.startsWith(matchedRoot)) {
     return NextResponse.json({ error: "Path is outside the allowed workspace roots" }, { status: 400 });
   }
 
