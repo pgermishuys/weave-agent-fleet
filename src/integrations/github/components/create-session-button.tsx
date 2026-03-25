@@ -158,7 +158,7 @@ export function CreateSessionButton({ contextSource, directory: defaultDir }: Cr
   // Auto-generate initial branch from context title
   useEffect(() => {
     if (open && !branchManuallyEdited) {
-      setBranch(generateBranchName(contextSource.title));
+      queueMicrotask(() => setBranch(generateBranchName(contextSource.title)));
     }
   }, [open, contextSource.title, branchManuallyEdited]);
 
