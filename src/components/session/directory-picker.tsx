@@ -63,6 +63,15 @@ export function DirectoryPicker({
   } = useDirectoryBrowser(popoverOpen);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const commandListRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [popoverWidth, setPopoverWidth] = useState<number | undefined>();
+
+  // Measure container width when popover opens
+  useEffect(() => {
+    if (popoverOpen && containerRef.current) {
+      setPopoverWidth(containerRef.current.offsetWidth);
+    }
+  }, [popoverOpen]);
 
   const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
     const el = commandListRef.current;
@@ -132,7 +141,7 @@ export function DirectoryPicker({
   };
 
   return (
-    <div className="flex gap-1.5">
+    <div ref={containerRef} className="flex gap-1.5">
       <Input
         id={id}
         value={value}
@@ -157,7 +166,8 @@ export function DirectoryPicker({
         <PopoverContent
           align="end"
           side="bottom"
-          className="w-80 p-0"
+          className="p-0"
+          style={popoverWidth ? { width: popoverWidth } : { width: 320 }}
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
           {/* Breadcrumb navigation */}
