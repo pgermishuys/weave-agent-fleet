@@ -15,6 +15,11 @@ describe("viewForPathname", () => {
     expect(viewForPathname("/github/octocat/hello-world")).toBe("github");
   });
 
+  it("maps repositories routes", () => {
+    expect(viewForPathname("/repositories")).toBe("repositories");
+    expect(viewForPathname("/repositories/%2Fhome%2Fuser%2Fmy-project")).toBe("repositories");
+  });
+
   it("maps welcome and ignores non-panel links", () => {
     expect(viewForPathname("/welcome")).toBe("welcome");
     expect(viewForPathname("/settings")).toBeNull();
@@ -28,6 +33,15 @@ describe("nextViewForSwitch", () => {
 
   it("closes panel when clicking active github icon", () => {
     expect(nextViewForSwitch("github", "github")).toBe("welcome");
+  });
+
+  it("closes panel when clicking active repositories icon", () => {
+    expect(nextViewForSwitch("repositories", "repositories")).toBe("welcome");
+  });
+
+  it("switches to repositories view", () => {
+    expect(nextViewForSwitch("fleet", "repositories")).toBe("repositories");
+    expect(nextViewForSwitch("welcome", "repositories")).toBe("repositories");
   });
 
   it("switches to target view for non-active or welcome views", () => {

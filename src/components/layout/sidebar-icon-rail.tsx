@@ -4,7 +4,7 @@ import { useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { LayoutGrid, Github, Settings } from "lucide-react";
+import { LayoutGrid, Github, Settings, FolderGit2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Tooltip,
@@ -24,6 +24,7 @@ const VIEW_DEFAULT_ROUTE: Record<SidebarView, string> = {
   welcome: "/welcome",
   fleet: "/",
   github: "/github",
+  repositories: "/repositories",
 };
 
 /** Routes that belong to the fleet view */
@@ -35,6 +36,7 @@ function isFleetRoute(pathname: string): boolean {
 export function viewForPathname(pathname: string): SidebarView | null {
   if (pathname === "/welcome") return "welcome";
   if (pathname === "/github" || pathname.startsWith("/github/")) return "github";
+  if (pathname === "/repositories" || pathname.startsWith("/repositories/")) return "repositories";
   if (isFleetRoute(pathname)) return "fleet";
   return null;
 }
@@ -167,6 +169,7 @@ export function SidebarIconRail() {
     welcome: VIEW_DEFAULT_ROUTE.welcome,
     fleet: VIEW_DEFAULT_ROUTE.fleet,
     github: VIEW_DEFAULT_ROUTE.github,
+    repositories: VIEW_DEFAULT_ROUTE.repositories,
   });
 
   // Keep the map up-to-date as the user navigates within a view
@@ -258,6 +261,7 @@ export function SidebarIconRail() {
       <div className="flex flex-col gap-0.5 px-1">
         <IconRailButton icon={LayoutGrid} label="Fleet" view="fleet" onSwitch={handleSwitch} />
         <IconRailButton icon={Github} label="GitHub" view="github" onSwitch={handleSwitch} />
+        <IconRailButton icon={FolderGit2} label="Repositories" view="repositories" onSwitch={handleSwitch} />
       </div>
 
       {/* Spacer */}

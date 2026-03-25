@@ -345,6 +345,100 @@ export interface AddWorkspaceRootResponse {
   path: string;
 }
 
+// ─── Repository Scanner Types ────────────────────────────────────────────────
+
+export interface ScannedRepository {
+  name: string;        // directory name, e.g. "my-project"
+  path: string;        // absolute path, e.g. "/home/user/repos/my-project"
+  parentRoot: string;  // the workspace root it was found under
+}
+
+export interface RepositoryScanResponse {
+  repositories: ScannedRepository[];
+  scannedAt: number;   // unix timestamp (ms) of last scan
+}
+
+export interface RepositoryInfo {
+  name: string;
+  path: string;
+  branch: string | null;
+  lastCommit: {
+    hash: string;
+    message: string;
+    author: string;
+    date: string;      // ISO timestamp
+  } | null;
+  remotes: Array<{ name: string; url: string }>;
+}
+
+export interface RepositoryInfoResponse {
+  repository: RepositoryInfo;
+}
+
+// ─── Repository Detail Types (enriched) ──────────────────────────────────────
+
+export interface BranchInfo {
+  name: string;           // e.g. "main", "remotes/origin/feature-x"
+  shortHash: string;      // abbreviated commit hash
+  message: string;        // latest commit subject
+  author: string;         // author name
+  authorEmail: string;    // author email (for gravatar)
+  date: string;           // ISO timestamp of latest commit
+  isCurrent: boolean;     // true if this is the HEAD branch
+  isRemote: boolean;      // true if starts with "remotes/" or "origin/"
+}
+
+export interface TagInfo {
+  name: string;           // e.g. "v1.0.0"
+  shortHash: string;      // abbreviated object hash
+  date: string;           // ISO timestamp (creator date)
+  tagger: string;         // tagger name (empty string for lightweight tags)
+  taggerEmail: string;    // tagger email (empty string for lightweight tags)
+}
+
+export interface CommitInfo {
+  hash: string;           // full SHA
+  shortHash: string;      // abbreviated SHA
+  message: string;        // subject line
+  author: string;         // author name
+  authorEmail: string;    // author email
+  date: string;           // ISO timestamp
+}
+
+export interface GitHubRemoteInfo {
+  owner: string;
+  repo: string;
+  repoUrl: string;        // https://github.com/owner/repo
+  issuesUrl: string;      // https://github.com/owner/repo/issues
+  pullsUrl: string;       // https://github.com/owner/repo/pulls
+}
+
+export interface RemoteInfo {
+  name: string;           // e.g. "origin"
+  url: string;            // raw URL
+  github: GitHubRemoteInfo | null; // parsed GitHub info, null if not GitHub
+}
+
+export interface RepositoryDetail {
+  name: string;
+  path: string;
+  branch: string | null;          // current HEAD branch
+  uncommittedCount: number;       // number of uncommitted files (from git status)
+  totalCommitCount: number;       // total commits on HEAD
+  firstCommitDate: string | null; // ISO timestamp of initial commit
+  lastCommitDate: string | null;  // ISO timestamp of most recent commit
+  branches: BranchInfo[];         // all branches sorted by committer date desc
+  tags: TagInfo[];                // all tags sorted by creator date desc
+  recentCommits: CommitInfo[];    // last 10 commits
+  remotes: RemoteInfo[];          // remotes with parsed GitHub info
+  readmeContent: string | null;   // raw README text, null if not found
+  readmeFilename: string | null;  // actual filename found (e.g. "README.md")
+}
+
+export interface RepositoryDetailResponse {
+  repository: RepositoryDetail;
+}
+
 // ─── Session History Types ──────────────────────────────────────────────────
 
 export interface HistorySession {

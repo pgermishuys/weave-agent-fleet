@@ -1,11 +1,11 @@
 {
-  "active_plan": "D:\\repos\\damianh\\weave-agent-fleet-sidebar\\.weave\\plans\\icon-rail-sidebar.md",
-  "started_at": "2026-03-21T08:48:22.475Z",
+  "active_plan": "D:\\repos\\damianh\\weave-agent-fleet-worktrees\\repository-scanner\\.weave\\plans\\repository-detail-enrichment.md",
+  "started_at": "2026-03-25T09:21:16.877Z",
   "session_ids": [
-    "ses_2f26a029fffe37eE0Mq1dzApD4"
+    "ses_2df00787effeph8fXx2ALeel81"
   ],
-  "plan_name": "icon-rail-sidebar",
+  "plan_name": "repository-detail-enrichment",
   "agent": "tapestry",
-  "start_sha": "01fe1c31b5a0e08c6bb15edec35f5eccfbc9f7e5",
+  "start_sha": "ff4db164053d2632995f26698b3c985120f1d1c4",
   "paused": true
 }

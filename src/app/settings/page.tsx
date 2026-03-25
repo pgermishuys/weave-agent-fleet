@@ -9,6 +9,7 @@ import { AboutTab } from "@/components/settings/about-tab";
 import { KeybindingsTab } from "@/components/settings/keybindings-tab";
 import { AppearanceTab } from "@/components/settings/appearance-tab";
 import { IntegrationsTab } from "@/components/settings/integrations-tab";
+import { RepositoriesTab } from "@/components/settings/repositories-tab";
 
 export default function SettingsPage() {
   return (
@@ -23,6 +24,7 @@ export default function SettingsPage() {
             <TabsTrigger value="keybindings">Keybindings</TabsTrigger>
             <TabsTrigger value="appearance">Appearance</TabsTrigger>
             <TabsTrigger value="integrations">Integrations</TabsTrigger>
+            <TabsTrigger value="repositories">Repositories</TabsTrigger>
             <TabsTrigger value="about">About</TabsTrigger>
           </TabsList>
           <TabsContent value="skills" className="mt-4">
@@ -42,6 +44,9 @@ export default function SettingsPage() {
           </TabsContent>
           <TabsContent value="integrations" className="mt-4">
             <IntegrationsTab />
+          </TabsContent>
+          <TabsContent value="repositories" className="mt-4">
+            <RepositoriesTab />
           </TabsContent>
           <TabsContent value="about" className="mt-4">
             <AboutTab />

@@ -11,6 +11,7 @@ import {
 import { useSidebarResize } from "@/hooks/use-sidebar-resize";
 import { FleetPanel } from "@/components/layout/fleet-panel";
 import { GitHubPanel } from "@/components/layout/github-panel";
+import { RepositoriesPanel } from "@/components/layout/repositories-panel";
 
 export function ContextualPanel() {
   const { activeView, toggleSidebar, width, setWidth, isResizing, setIsResizing } =
@@ -48,13 +49,22 @@ export function ContextualPanel() {
   return (
     <div
       role="region"
-      aria-label={activeView === "fleet" ? "Fleet panel" : "GitHub panel"}
+      aria-label={
+        activeView === "fleet"
+          ? "Fleet panel"
+          : activeView === "github"
+          ? "GitHub panel"
+          : activeView === "repositories"
+          ? "Repositories panel"
+          : "Sidebar panel"
+      }
       style={{ width }}
       className="relative flex flex-col h-full overflow-hidden"
     >
       {/* Panel content */}
       {activeView === "fleet" && <FleetPanel />}
       {activeView === "github" && <GitHubPanel />}
+      {activeView === "repositories" && <RepositoriesPanel />}
 
       {/* Resize handle */}
       <div
