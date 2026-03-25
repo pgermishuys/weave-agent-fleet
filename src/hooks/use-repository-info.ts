@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { apiFetch } from "@/lib/api-client";
 import type { RepositoryInfo, RepositoryInfoResponse } from "@/lib/api-types";
 
@@ -15,40 +15,46 @@ export function useRepositoryInfo(path: string | null): UseRepositoryInfoResult 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (path === null) {
-      setInfo(null);
-      setIsLoading(false);
-      setError(null);
-      return;
-    }
-
-    let cancelled = false;
+  const fetchInfo = useCallback(async (repoPath: string, signal: AbortSignal) => {
     setIsLoading(true);
     setError(null);
     setInfo(null);
 
-    apiFetch(`/api/repositories/info?path=${encodeURIComponent(path)}`)
-      .then(async (res) => {
-        if (cancelled) return;
-        if (!res.ok) {
-          const data: { error?: string } = await res.json().catch(() => ({}));
-          throw new Error(data.error ?? "Failed to load repository info");
-        }
-        const data: RepositoryInfoResponse = await res.json();
-        if (!cancelled) setInfo(data.repository);
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Unknown error");
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
+    try {
+      const res = await apiFetch(
+        `/api/repositories/info?path=${encodeURIComponent(repoPath)}`,
+        { signal }
+      );
+      if (signal.aborted) return;
+      if (!res.ok) {
+        const data: { error?: string } = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to load repository info");
+      }
+      const data: RepositoryInfoResponse = await res.json();
+      if (!signal.aborted) setInfo(data.repository);
+    } catch (err: unknown) {
+      if (signal.aborted) return;
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      if (!signal.aborted) setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (path === null) return;
+
+    const controller = new AbortController();
+    void fetchInfo(path, controller.signal);
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
-  }, [path]);
+  }, [path, fetchInfo]);
+
+  // When path is null, return defaults without triggering setState
+  if (path === null) {
+    return { info: null, isLoading: false, error: null };
+  }
 
   return { info, isLoading, error };
 }

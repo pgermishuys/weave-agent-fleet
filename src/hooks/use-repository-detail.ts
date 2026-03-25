@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { apiFetch } from "@/lib/api-client";
 import type { RepositoryDetail, RepositoryDetailResponse } from "@/lib/api-types";
 
@@ -15,40 +15,46 @@ export function useRepositoryDetail(path: string | null): UseRepositoryDetailRes
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (path === null) {
-      setDetail(null);
-      setIsLoading(false);
-      setError(null);
-      return;
-    }
-
-    let cancelled = false;
+  const fetchDetail = useCallback(async (repoPath: string, signal: AbortSignal) => {
     setIsLoading(true);
     setError(null);
     setDetail(null);
 
-    apiFetch(`/api/repositories/detail?path=${encodeURIComponent(path)}`)
-      .then(async (res) => {
-        if (cancelled) return;
-        if (!res.ok) {
-          const data: { error?: string } = await res.json().catch(() => ({}));
-          throw new Error(data.error ?? "Failed to load repository detail");
-        }
-        const data: RepositoryDetailResponse = await res.json();
-        if (!cancelled) setDetail(data.repository);
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Unknown error");
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
+    try {
+      const res = await apiFetch(
+        `/api/repositories/detail?path=${encodeURIComponent(repoPath)}`,
+        { signal }
+      );
+      if (signal.aborted) return;
+      if (!res.ok) {
+        const data: { error?: string } = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to load repository detail");
+      }
+      const data: RepositoryDetailResponse = await res.json();
+      if (!signal.aborted) setDetail(data.repository);
+    } catch (err: unknown) {
+      if (signal.aborted) return;
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      if (!signal.aborted) setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (path === null) return;
+
+    const controller = new AbortController();
+    void fetchDetail(path, controller.signal);
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
-  }, [path]);
+  }, [path, fetchDetail]);
+
+  // When path becomes null, return defaults (no setState needed — values reset on next non-null path)
+  if (path === null) {
+    return { detail: null, isLoading: false, error: null };
+  }
 
   return { detail, isLoading, error };
 }

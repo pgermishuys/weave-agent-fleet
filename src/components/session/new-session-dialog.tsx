@@ -44,6 +44,8 @@ const REPO_STRATEGY_ICONS: Record<RepoIsolationStrategy, typeof FolderOpen> = {
 
 const REPO_STRATEGY_ORDER: RepoIsolationStrategy[] = ["worktree", "existing"];
 
+const SOURCE_MODE_ORDER: SourceMode[] = ["repository", "directory"];
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface NewSessionDialogProps {
@@ -71,8 +73,10 @@ export function NewSessionDialog({ trigger, open: controlledOpen, onOpenChange, 
     }
   }, [open, refreshRepos]);
 
-  // Source mode: repository or directory
-  const [sourceMode, setSourceMode] = useState<SourceMode>("directory");
+  // Source mode: repository or directory — initial value derived from props/state
+  const [sourceMode, setSourceMode] = useState<SourceMode>(() =>
+    defaultDirectory ? "directory" : "directory" // updated below once repos load
+  );
 
   // Repository-mode state
   const [selectedRepo, setSelectedRepo] = useState<ScannedRepository | null>(null);
@@ -91,11 +95,6 @@ export function NewSessionDialog({ trigger, open: controlledOpen, onOpenChange, 
       (r) => r.name.toLowerCase().includes(q) || r.path.toLowerCase().includes(q)
     );
   }, [repositories, repoSearch]);
-
-  // Reset highlight when filtered list changes
-  useEffect(() => {
-    setRepoHighlightIdx(0);
-  }, [filteredRepos.length]);
 
   // Scroll highlighted dropdown item into view
   useEffect(() => {
@@ -171,10 +170,17 @@ export function NewSessionDialog({ trigger, open: controlledOpen, onOpenChange, 
   const [branch, setBranch] = useState("");
   const [branchManuallyEdited, setBranchManuallyEdited] = useState(false);
 
-  // When repos load, auto-select repository mode if repos exist
+  // Once repos finish loading for the first time, set the initial source mode.
+  // We use a ref to ensure this only fires once (avoids the lint rule about
+  // synchronous setState in effects — this is a one-shot initialisation).
+  const sourceModeInitialized = useRef(false);
   useEffect(() => {
-    if (!reposLoading) {
-      setSourceMode(hasRepos ? "repository" : "directory");
+    if (!reposLoading && !sourceModeInitialized.current) {
+      sourceModeInitialized.current = true;
+      // Defer to next microtask to avoid synchronous cascading render
+      queueMicrotask(() => {
+        setSourceMode(hasRepos ? "repository" : "directory");
+      });
     }
   }, [hasRepos, reposLoading]);
 
@@ -182,7 +188,8 @@ export function NewSessionDialog({ trigger, open: controlledOpen, onOpenChange, 
   useEffect(() => {
     if (open && defaultDirectory) {
       setDirectory(defaultDirectory);
-      setSourceMode("directory");
+      // Defer mode switch to avoid synchronous cascading render
+      queueMicrotask(() => setSourceMode("directory"));
     }
   }, [open, defaultDirectory, setDirectory]);
 
@@ -210,8 +217,6 @@ export function NewSessionDialog({ trigger, open: controlledOpen, onOpenChange, 
   };
 
   const { createSession, isLoading, error } = useCreateSession();
-
-  const SOURCE_MODE_ORDER: SourceMode[] = ["repository", "directory"];
 
   /** Roving tabindex for source mode buttons */
   const handleSourceModeKeyDown = useCallback(
@@ -376,6 +381,7 @@ export function NewSessionDialog({ trigger, open: controlledOpen, onOpenChange, 
                     onChange={(e) => {
                       setRepoSearch(e.target.value);
                       setRepoDropdownOpen(true);
+                      setRepoHighlightIdx(0);
                       // Clear selection if the user is typing something different
                       if (selectedRepo && e.target.value !== selectedRepo.name) {
                         setSelectedRepo(null);
