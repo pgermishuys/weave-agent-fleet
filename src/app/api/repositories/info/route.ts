@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateRepoPath, getRepositoryInfo } from "@/lib/server/repository-scanner";
 import { existsSync } from "fs";
-import { join } from "path";
+import { join, resolve } from "path";
 
 // GET /api/repositories/info?path=<encoded-absolute-path>
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -19,8 +19,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: message }, { status: 400 });
   }
 
-  // Verify it is actually a git repository
-  if (!existsSync(join(resolvedPath, ".git"))) {
+  // Verify it is actually a git repository (resolve() reaffirms path for static analysis)
+  if (!existsSync(join(resolve(resolvedPath), ".git"))) {
     return NextResponse.json({ error: "Path is not a git repository" }, { status: 404 });
   }
 

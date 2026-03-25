@@ -114,10 +114,29 @@ const GIT_EXEC_OPTIONS = {
 };
 
 /**
+ * Inline path sanitizer visible to CodeQL's taint analysis.
+ * Resolves the path and asserts it falls under an allowed workspace root.
+ * Duplicates the check in validateRepoPath() but makes the data-flow
+ * cut-point explicit for static analysis tools (CWE-22 path traversal).
+ */
+function sanitizeRepoPath(repoPath: string): string {
+  const resolved = resolve(repoPath);
+  const roots = getAllowedRoots();
+  const allowed = roots.some(
+    (root) => resolved === root || resolved.startsWith(root + sep)
+  );
+  if (!allowed) {
+    throw new Error("Path is outside the allowed workspace roots.");
+  }
+  return resolved;
+}
+
+/**
  * Retrieve git metadata for a single validated repository path.
  * The caller must ensure the path is under an allowed root before calling this.
  */
 export function getRepositoryInfo(repoPath: string): RepositoryInfo {
+  repoPath = sanitizeRepoPath(repoPath);
   const name = repoPath.split(/[\\/]/).filter(Boolean).at(-1) ?? repoPath;
 
   // Current branch
@@ -215,6 +234,7 @@ const README_MAX_CHARS = 50_000;
 export function findReadme(
   repoPath: string
 ): { content: string; filename: string } | null {
+  repoPath = sanitizeRepoPath(repoPath);
   for (const filename of README_CANDIDATES) {
     const fullPath = join(repoPath, filename);
     if (existsSync(fullPath)) {
@@ -235,6 +255,7 @@ export function findReadme(
  * return sensible defaults rather than crashing the whole response.
  */
 export function getRepositoryDetail(repoPath: string): RepositoryDetail {
+  repoPath = sanitizeRepoPath(repoPath);
   const name = repoPath.split(/[\\/]/).filter(Boolean).at(-1) ?? repoPath;
   const opts = { ...GIT_EXEC_OPTIONS, cwd: repoPath };
 
