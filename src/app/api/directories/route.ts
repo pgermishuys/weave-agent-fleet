@@ -23,6 +23,11 @@ const NOISE_DIRECTORIES = new Set([
   ".turbo",
   ".vercel",
   ".output",
+  // Windows system directories
+  "System Volume Information",
+  "Recovery",
+  "PerfLogs",
+  "msdownld.tmp",
 ]);
 
 /** Maximum entries returned per listing to prevent massive payloads. */
@@ -128,6 +133,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       if (NOISE_DIRECTORIES.has(dirent.name)) continue;
       // Skip hidden directories (starting with .)
       if (dirent.name.startsWith(".")) continue;
+      // Skip Windows system directories (starting with $)
+      if (dirent.name.startsWith("$")) continue;
 
       const entryPath = join(resolved, dirent.name);
 
