@@ -75,7 +75,7 @@ export function NewSessionDialog({ trigger, open: controlledOpen, onOpenChange, 
 
   // Source mode: repository or directory — initial value derived from props/state
   const [sourceMode, setSourceMode] = useState<SourceMode>(() =>
-    defaultDirectory ? "directory" : "directory" // updated below once repos load
+    defaultDirectory ? "directory" : "repository" // updated below once repos load
   );
 
   // Repository-mode state
