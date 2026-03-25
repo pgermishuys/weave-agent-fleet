@@ -22,7 +22,7 @@ import { AddRepoDialog } from "@/integrations/github/components/add-repo-dialog"
 export function GitHubPanel() {
   const pathname = usePathname();
   const { connectedIntegrations } = useIntegrationsContext();
-  const { repos, removeRepo } = useBookmarkedRepos();
+  const { repos, removeRepo, error } = useBookmarkedRepos();
   const isGitHubConnected = connectedIntegrations.some((i) => i.id === "github");
 
   const isGitHubIndexActive = pathname === "/github";
@@ -66,6 +66,10 @@ export function GitHubPanel() {
         <p className="px-3 py-2 text-xs text-muted-foreground">
           GitHub is not connected. Open Settings to reconnect.
         </p>
+      )}
+
+      {error && (
+        <p className="px-3 py-1.5 text-xs text-destructive">{error}</p>
       )}
 
       {/* Repo list */}
