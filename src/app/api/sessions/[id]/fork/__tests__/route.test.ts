@@ -27,9 +27,14 @@ vi.mock("@/lib/server/logger", () => ({
   },
 }));
 
-vi.mock("crypto", () => ({
-  randomUUID: vi.fn(() => "new-db-session-uuid"),
-}));
+vi.mock("crypto", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("crypto")>();
+  const mocked = {
+    ...actual,
+    randomUUID: vi.fn(() => "new-db-session-uuid"),
+  };
+  return { ...mocked, default: mocked };
+});
 
 // ─── Imports (after mocks) ────────────────────────────────────────────────────
 

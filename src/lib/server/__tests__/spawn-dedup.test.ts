@@ -38,17 +38,20 @@ let nextPid = 10000;
 
 // ─── Module mocks ─────────────────────────────────────────────────────────────
 
-vi.mock("child_process", () => ({
-  spawn: vi.fn((...args: unknown[]) => {
-    const proc = createMockProc(nextPid++);
-    spawnCalls.push({
-      command: args[0] as string,
-      args: args[1] as string[],
-      mockProc: proc,
-    });
-    return proc;
-  }),
-}));
+vi.mock("child_process", () => {
+  const mocked = {
+    spawn: vi.fn((...args: unknown[]) => {
+      const proc = createMockProc(nextPid++);
+      spawnCalls.push({
+        command: args[0] as string,
+        args: args[1] as string[],
+        mockProc: proc,
+      });
+      return proc;
+    }),
+  };
+  return { ...mocked, default: mocked };
+});
 
 vi.mock("@opencode-ai/sdk/v2", () => ({
   createOpencodeClient: vi.fn(() => ({
@@ -99,7 +102,7 @@ vi.mock("@/cli/config-paths", () => ({
 // Mock net — isPortAvailable uses createServer to check port availability
 vi.mock("net", async () => {
   const { EventEmitter: EE } = await vi.importActual<typeof import("events")>("events");
-  return {
+  const mocked = {
     createServer: vi.fn(() => {
       const server = new EE() as unknown as Record<string, unknown>;
       server.listen = vi.fn(() => {
@@ -117,13 +120,14 @@ vi.mock("net", async () => {
       setTimeout() {}
     },
   };
+  return { ...mocked, default: mocked };
 });
 
 // Mock fs — validateDirectory is NOT called by spawnInstance, but the module
 // top-level code checks OPENCODE_BIN via existsSync.
 vi.mock("fs", async () => {
   const actual = await vi.importActual<typeof import("fs")>("fs");
-  return {
+  const mocked = {
     ...actual,
     existsSync: vi.fn((p: string) => {
       if (typeof p === "string" && p.startsWith("/tmp")) return true;
@@ -135,6 +139,7 @@ vi.mock("fs", async () => {
       return actual.statSync(p);
     }),
   };
+  return { ...mocked, default: mocked };
 });
 
 // ─── Import SUT after all mocks ───────────────────────────────────────────────

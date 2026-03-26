@@ -12,11 +12,12 @@ import type { ChildProcess } from "child_process";
 // We mock child_process to intercept execSync/exec calls
 vi.mock("child_process", async (importOriginal) => {
   const actual = await importOriginal<typeof import("child_process")>();
-  return {
+  const mocked = {
     ...actual,
     execSync: vi.fn(),
     exec: vi.fn(),
   };
+  return { ...mocked, default: mocked };
 });
 
 // Import after mocking

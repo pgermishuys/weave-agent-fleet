@@ -16,9 +16,14 @@ vi.mock("@/lib/server/db-repository", () => ({
   updateSessionForResume: vi.fn(),
 }));
 
-vi.mock("fs", () => ({
-  existsSync: vi.fn(() => true),
-}));
+vi.mock("fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("fs")>();
+  const mocked = {
+    ...actual,
+    existsSync: vi.fn(() => true),
+  };
+  return { ...mocked, default: mocked };
+});
 
 // ─── Imports (after mocks) ────────────────────────────────────────────────────
 

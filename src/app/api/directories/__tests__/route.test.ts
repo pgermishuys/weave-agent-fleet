@@ -9,12 +9,17 @@ vi.mock("@/lib/server/process-manager", () => ({
   _recoveryComplete: Promise.resolve(),
 }));
 
-vi.mock("fs", () => ({
-  readdirSync: vi.fn(() => []),
-  existsSync: vi.fn(() => true),
-  statSync: vi.fn(() => ({ isDirectory: () => true })),
-  realpathSync: vi.fn((p: string) => p),
-}));
+vi.mock("fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("fs")>();
+  const mocked = {
+    ...actual,
+    readdirSync: vi.fn(() => []),
+    existsSync: vi.fn(() => true),
+    statSync: vi.fn(() => ({ isDirectory: () => true })),
+    realpathSync: vi.fn((p: string) => p),
+  };
+  return { ...mocked, default: mocked };
+});
 
 // ─── Imports (after mocks) ────────────────────────────────────────────────────
 
