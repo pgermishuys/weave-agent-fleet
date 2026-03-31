@@ -67,8 +67,6 @@ jobs:
       - name: Run Tauri pre-build (dev channel)
         run: node scripts/tauri-prebuild.mjs
         env:
-          WEAVE_UPDATE_CHANNEL: dev
-          WEAVE_DEV_BUILD_ID: ${{ github.run_number }}
           TAURI_TARGET_TRIPLE: ${{ matrix.rust_target }}
 
       - name: Build and publish Tauri dev channel
@@ -83,5 +81,5 @@ jobs:
           releaseBody: Automated dev channel release from main.
           releaseDraft: false
           prerelease: true
-          includeUpdaterJson: true
+          includeUpdaterJson: false
           args: ${{ matrix.args }}
