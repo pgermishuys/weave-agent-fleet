@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { useIntegrationsContext } from "@/contexts/integrations-context";
 import { getIntegrations } from "@/integrations/registry";
 import { useGitHubRepos } from "@/integrations/github/hooks/use-github-repos";
+import { useGoogleChatSpaces } from "@/integrations/google-chat/hooks/use-google-chat-spaces";
+import { handleDisconnectGoogleChat } from "@/integrations/google-chat/settings";
 
 function formatRelativeTime(ts: number | null): string {
   if (ts === null) return "Never";
@@ -50,6 +52,45 @@ function GitHubConnectedActions({
       </div>
       <p className="text-xs text-muted-foreground">
         {repos.length} repos loaded · Updated {formatRelativeTime(lastUpdated)}
+      </p>
+    </div>
+  );
+}
+
+function GoogleChatConnectedActions({
+  onDisconnect,
+}: {
+  onDisconnect: () => void;
+}) {
+  const { spaces, isLoading, lastUpdated, refresh } = useGoogleChatSpaces();
+
+  function handleDisconnect() {
+    handleDisconnectGoogleChat();
+    onDisconnect();
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <Button size="sm" variant="outline" onClick={handleDisconnect}>
+          Disconnect
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={refresh}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <RefreshCw className="h-3 w-3" />
+          )}
+          Refresh spaces
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {spaces.length} spaces loaded · Updated {formatRelativeTime(lastUpdated)}
       </p>
     </div>
   );
@@ -119,6 +160,10 @@ export function IntegrationsTab() {
                 {connected ? (
                   manifest.id === "github" ? (
                     <GitHubConnectedActions
+                      onDisconnect={() => disconnect(manifest.id)}
+                    />
+                  ) : manifest.id === "google-chat" ? (
+                    <GoogleChatConnectedActions
                       onDisconnect={() => disconnect(manifest.id)}
                     />
                   ) : (

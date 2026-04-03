@@ -12,6 +12,7 @@ import { useSidebarResize } from "@/hooks/use-sidebar-resize";
 import { FleetPanel } from "@/components/layout/fleet-panel";
 import { GitHubPanel } from "@/components/layout/github-panel";
 import { RepositoriesPanel } from "@/components/layout/repositories-panel";
+import { GoogleChatPanel } from "@/components/layout/google-chat-panel";
 
 export function ContextualPanel() {
   const { activeView, toggleSidebar, width, setWidth, isResizing, setIsResizing } =
@@ -56,6 +57,8 @@ export function ContextualPanel() {
           ? "GitHub panel"
           : activeView === "repositories"
           ? "Repositories panel"
+          : activeView === "google-chat"
+          ? "Google Chat panel"
           : "Sidebar panel"
       }
       style={{ width }}
@@ -65,6 +68,7 @@ export function ContextualPanel() {
       {activeView === "fleet" && <FleetPanel />}
       {activeView === "github" && <GitHubPanel />}
       {activeView === "repositories" && <RepositoriesPanel />}
+      {activeView === "google-chat" && <GoogleChatPanel />}
 
       {/* Resize handle */}
       <div
