@@ -98,7 +98,7 @@ export function GoogleChatSettings() {
         connectState.status === "fetching-url")
     ) {
       stopPolling();
-      setConnectState({ status: "complete" });
+      queueMicrotask(() => setConnectState({ status: "complete" }));
     }
   }, [isConnected, connectState.status, stopPolling]);
 

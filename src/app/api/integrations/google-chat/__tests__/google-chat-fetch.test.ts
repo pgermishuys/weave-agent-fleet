@@ -63,7 +63,6 @@ describe("getGoogleChatToken", () => {
 
     const token = await getGoogleChatToken();
     expect(token).toBe("ya29.access-token");
-    expect(global.fetch).toBeUndefined; // No fetch should happen
   });
 
   it("ReturnsNullWhenNotConfigured", async () => {
