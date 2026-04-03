@@ -140,21 +140,6 @@ export function GoogleChatSettings() {
     setConnectState({ status: "idle" });
   }
 
-  async function handleDisconnect() {
-    stopPolling();
-    clearGoogleChatClientState();
-
-    try {
-      await apiFetch("/api/integrations/google-chat/auth/revoke", {
-        method: "POST",
-      });
-    } catch {
-      // Revocation failure is non-fatal — disconnect anyway
-    }
-
-    // Let the integrations-tab handle the generic disconnect
-  }
-
   // When already connected, settings tab handles disconnect
   if (isConnected) {
     return null;
