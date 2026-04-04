@@ -101,16 +101,6 @@ describe("GET /api/integrations/google-chat/auth/url", () => {
     expect(body.error).toBeTruthy();
   });
 
-  it("Returns500WhenClientIdEnvVarMissing", async () => {
-    delete process.env.GOOGLE_CHAT_CLIENT_ID;
-    const req = makeRequest();
-    const res = await GET(req);
-
-    expect(res.status).toBe(500);
-    const body = await res.json();
-    expect(body.error).toBeTruthy();
-  });
-
   it("GeneratesUniqueStatePerRequest", async () => {
     const req1 = makeRequest();
     const req2 = makeRequest();

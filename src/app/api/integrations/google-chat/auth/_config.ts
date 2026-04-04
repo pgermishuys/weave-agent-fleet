@@ -1,34 +1,23 @@
 /**
  * Google OAuth 2.0 configuration for the Authorization Code + PKCE flow (RFC 7636).
  *
- * IMPORTANT — Google Cloud Console setup required:
- *   1. Create an OAuth 2.0 Client ID with type "Desktop application".
- *      Desktop application clients do NOT issue a client_secret — PKCE replaces it.
- *   2. Add the redirect URI to the list of authorized redirect URIs:
- *      http://localhost:{port}/api/integrations/google-chat/auth/callback
- *      (Replace {port} with the port Weave runs on, typically 3000.)
- *      Failure to register this URI causes a redirect_uri_mismatch error.
- *   3. Enable the Google Chat API in APIs & Services → Library.
- *   4. Set the GOOGLE_CHAT_CLIENT_ID environment variable to the Client ID value.
+ * The default client ID below is a "Desktop application" OAuth client owned by the
+ * Weave Agent Fleet project.  Desktop clients do NOT issue a client_secret — PKCE
+ * replaces it.  Users can override this by setting the GOOGLE_CHAT_CLIENT_ID
+ * environment variable.
  *
  * There is no GOOGLE_CHAT_CLIENT_SECRET — Desktop application type does not issue one.
  */
 
 /**
- * Google OAuth 2.0 Client ID for Weave Agent Fleet.
- * Must be set via the GOOGLE_CHAT_CLIENT_ID environment variable.
- * Obtained from Google Cloud Console → APIs & Services → Credentials.
+ * Default Google OAuth 2.0 Client ID for Weave Agent Fleet (Desktop application type).
+ * Can be overridden via the GOOGLE_CHAT_CLIENT_ID environment variable.
  */
+const DEFAULT_GOOGLE_CHAT_CLIENT_ID =
+  "739753924831-uvrtq7qls7etc03rfi27a95pgrj7rk90.apps.googleusercontent.com";
+
 export function getGoogleChatClientId(): string {
-  const clientId = process.env.GOOGLE_CHAT_CLIENT_ID;
-  if (!clientId) {
-    throw new Error(
-      "GOOGLE_CHAT_CLIENT_ID environment variable is not set. " +
-        "Create a 'Desktop application' OAuth client in Google Cloud Console " +
-        "and set the Client ID as GOOGLE_CHAT_CLIENT_ID."
-    );
-  }
-  return clientId;
+  return process.env.GOOGLE_CHAT_CLIENT_ID ?? DEFAULT_GOOGLE_CHAT_CLIENT_ID;
 }
 
 /** Google OAuth 2.0 authorization endpoint */
