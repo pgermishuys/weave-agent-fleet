@@ -49,3 +49,24 @@ export const GOOGLE_CHAT_SCOPES = [
  */
 export const GOOGLE_REDIRECT_PATH =
   "/api/integrations/google-chat/auth/callback";
+
+/**
+ * Derives the full redirect URI from a NextRequest.
+ *
+ * In dev mode (e.g. `bun run dev:ui`) Next.js may proxy requests, so
+ * `request.url` can report a different port than the one the browser is
+ * actually on.  The `Host` / `x-forwarded-host` header carries the real
+ * host:port the user's browser connected to.
+ */
+export function getRedirectUri(request: { url: string; headers: { get(name: string): string | null } }): string {
+  const forwarded = request.headers.get("x-forwarded-host");
+  const host = forwarded ?? request.headers.get("host");
+
+  if (host) {
+    return `http://${host}${GOOGLE_REDIRECT_PATH}`;
+  }
+
+  // Fallback: derive from request.url
+  const url = new URL(request.url);
+  return `http://localhost:${url.port || "3000"}${GOOGLE_REDIRECT_PATH}`;
+}

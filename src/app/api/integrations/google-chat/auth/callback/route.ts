@@ -4,7 +4,7 @@ import { setIntegrationConfig } from "@/lib/server/integration-store";
 import {
   getGoogleChatClientId,
   GOOGLE_TOKEN_URL,
-  GOOGLE_REDIRECT_PATH,
+  getRedirectUri,
 } from "../_config";
 import { consumePendingSession } from "../_pkce";
 import type {
@@ -157,7 +157,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return htmlResponse(ERROR_HTML, 500);
   }
 
-  const redirectUri = `http://localhost:${requestUrl.port || "3000"}${GOOGLE_REDIRECT_PATH}`;
+  const redirectUri = getRedirectUri(request);
 
   // Exchange authorization code for tokens
   let tokenResponse: Response;
@@ -186,10 +186,16 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   if (!tokenResponse.ok) {
+    let errorBody: unknown;
+    try {
+      errorBody = await tokenResponse.json();
+    } catch {
+      errorBody = await tokenResponse.text().catch(() => "(unreadable)");
+    }
     log.warn(
       "google-chat-callback",
       "Google token endpoint returned non-200",
-      { status: tokenResponse.status }
+      { status: tokenResponse.status, errorBody, redirectUri }
     );
     return htmlResponse(ERROR_HTML, 502);
   }

@@ -4,7 +4,7 @@ import {
   getGoogleChatClientId,
   GOOGLE_AUTH_URL,
   GOOGLE_CHAT_SCOPES,
-  GOOGLE_REDIRECT_PATH,
+  getRedirectUri,
 } from "../_config";
 import {
   generateCodeVerifier,
@@ -64,7 +64,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   storePendingSession(state, codeVerifier);
 
-  const redirectUri = `http://localhost:${requestUrl.port || "3000"}${GOOGLE_REDIRECT_PATH}`;
+  const redirectUri = getRedirectUri(request);
 
   const params = new URLSearchParams({
     client_id: clientId,
