@@ -14,7 +14,7 @@
  * Can be overridden via the GOOGLE_CHAT_CLIENT_ID environment variable.
  */
 const DEFAULT_GOOGLE_CHAT_CLIENT_ID =
-  "739753924831-uvrtq7qls7etc03rfi27a95pgrj7rk90.apps.googleusercontent.com";
+  "739753924831-k8bovd4if5ntiqujepf69gl2dh2t504b.apps.googleusercontent.com";
 
 export function getGoogleChatClientId(): string {
   return process.env.GOOGLE_CHAT_CLIENT_ID ?? DEFAULT_GOOGLE_CHAT_CLIENT_ID;
