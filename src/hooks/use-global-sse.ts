@@ -14,7 +14,7 @@
  */
 
 import { useEffect } from "react";
-import { sseUrl } from "@/lib/api-client";
+import { sseUrl, isSessionUnauthenticated } from "@/lib/api-client";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -80,7 +80,21 @@ function handleError(): void {
     eventSource = null;
   }
   if (subscriberCount > 0) {
-    scheduleReconnect();
+    // Check if error is due to authentication failure before scheduling reconnect.
+    // EventSource fires onerror on HTTP 401 — if unauthenticated, redirect to login
+    // rather than reconnecting indefinitely.
+    void isSessionUnauthenticated().then((unauthenticated) => {
+      if (unauthenticated) {
+        if (typeof window !== "undefined") {
+          const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+          window.location.href = `/login?returnUrl=${returnUrl}`;
+        }
+        return;
+      }
+      if (subscriberCount > 0) {
+        scheduleReconnect();
+      }
+    });
   }
 }
 
