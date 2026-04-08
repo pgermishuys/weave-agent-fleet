@@ -183,7 +183,7 @@ export function SpawnSessionDialog({
               onChange={(e) => setPrompt(e.target.value)}
               rows={12}
               disabled={isSpawning}
-              className="font-mono text-xs leading-relaxed"
+              className="font-mono text-xs leading-relaxed thin-scrollbar"
             />
           </div>
 
