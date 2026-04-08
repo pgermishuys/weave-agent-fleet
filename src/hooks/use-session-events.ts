@@ -5,7 +5,7 @@ import type {
   AccumulatedMessage,
   SSEEvent,
 } from "@/lib/api-types";
-import { apiFetch, sseUrl } from "@/lib/api-client";
+import { apiFetch, sseUrl, isSessionUnauthenticated } from "@/lib/api-client";
 import { fetchSessionStatus } from "@/lib/session-status-utils";
 import {
   ensureMessage,
@@ -316,20 +316,34 @@ export function useSessionEvents(
       es.close();
       eventSourceRef.current = null;
 
-      setReconnectAttempt((prev: number) => {
-        const next = prev + 1;
-        if (next >= MAX_RECONNECT_ATTEMPTS) {
-          setStatus("abandoned");
-          // Don't schedule any more retries
-          return next;
+      // Check if the error is due to authentication failure (HTTP 401).
+      // EventSource doesn't expose the HTTP status, so we probe /api/auth/status.
+      // If unauthenticated, redirect to login instead of scheduling a reconnect.
+      void isSessionUnauthenticated().then((unauthenticated) => {
+        if (!isMounted.current) return;
+        if (unauthenticated) {
+          if (typeof window !== "undefined") {
+            const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+            window.location.href = `/login?returnUrl=${returnUrl}`;
+          }
+          return;
         }
-        setStatus("disconnected");
-        const delay = reconnectDelay.current;
-        reconnectDelay.current = Math.min(delay * 2, MAX_RECONNECT_DELAY_MS);
-        reconnectTimerRef.current = setTimeout(() => {
-          if (isMounted.current) connectRef.current?.();
-        }, delay);
-        return next;
+
+        setReconnectAttempt((prev: number) => {
+          const next = prev + 1;
+          if (next >= MAX_RECONNECT_ATTEMPTS) {
+            setStatus("abandoned");
+            // Don't schedule any more retries
+            return next;
+          }
+          setStatus("disconnected");
+          const delay = reconnectDelay.current;
+          reconnectDelay.current = Math.min(delay * 2, MAX_RECONNECT_DELAY_MS);
+          reconnectTimerRef.current = setTimeout(() => {
+            if (isMounted.current) connectRef.current?.();
+          }, delay);
+          return next;
+        });
       });
     };
   }, [sessionId, instanceId, loadMessagesSince, loadInitialMessages, loadSessionStatus, hydratePagination, suppressAutoScrollRef]);

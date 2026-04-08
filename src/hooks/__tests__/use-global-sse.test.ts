@@ -10,6 +10,16 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+// ─── Mock api-client ────────────────────────────────────────────────────────
+// The module under test imports `sseUrl` and `isSessionUnauthenticated` from
+// @/lib/api-client. Mock them so tests don't depend on real network calls.
+// `isSessionUnauthenticated` resolves to false by default (auth OK → normal reconnect).
+
+vi.mock("@/lib/api-client", () => ({
+  sseUrl: (path: string) => path,
+  isSessionUnauthenticated: vi.fn(() => Promise.resolve(false)),
+}));
+
 // ─── EventSource mock ───────────────────────────────────────────────────────
 
 interface MockES {
@@ -243,7 +253,7 @@ describe("useGlobalSSE singleton", () => {
   });
 
   describe("reconnection", () => {
-    it("closes EventSource on error and schedules reconnect", () => {
+    it("closes EventSource on error and schedules reconnect", async () => {
       vi.useFakeTimers();
       _subscribe();
 
@@ -253,8 +263,9 @@ describe("useGlobalSSE singleton", () => {
       expect(es.close).toHaveBeenCalledTimes(1);
       expect(_isConnected()).toBe(false);
 
-      // Advance past reconnect delay (base 1s + up to 1s jitter)
-      vi.advanceTimersByTime(2100);
+      // Flush the async auth check (isSessionUnauthenticated resolves to false)
+      // then advance past reconnect delay (base 1s + up to 1s jitter)
+      await vi.advanceTimersByTimeAsync(2100);
 
       expect(_isConnected()).toBe(true);
       expect(mockInstances).toHaveLength(2); // New EventSource created
@@ -262,19 +273,19 @@ describe("useGlobalSSE singleton", () => {
       vi.useRealTimers();
     });
 
-    it("resets backoff delay on successful open", () => {
+    it("resets backoff delay on successful open", async () => {
       vi.useFakeTimers();
       _subscribe();
 
       const es1 = mockInstances[0]!;
       // Simulate error → reconnect → open → error → reconnect
       es1.onerror!(); // Closes, schedules reconnect with base delay
-      vi.advanceTimersByTime(2100);
+      await vi.advanceTimersByTimeAsync(2100);
 
       const es2 = mockInstances[1]!;
       es2.onopen!(); // Reset backoff
       es2.onerror!(); // Should use base delay again, not doubled
-      vi.advanceTimersByTime(2100); // Base delay + jitter
+      await vi.advanceTimersByTimeAsync(2100); // Base delay + jitter
 
       expect(mockInstances).toHaveLength(3);
 

@@ -161,6 +161,9 @@ case "${1:-}" in
     echo "  PORT                  Server port (default: 3000)"
     echo "  WEAVE_PROFILE         Profile name (default: unset = 'default')"
     echo "  WEAVE_HOSTNAME        Server bind address (default: 0.0.0.0)"
+    echo "  WEAVE_AUTH_TOKEN      Auth token for remote access (default: auto-generated)"
+    echo "                        Set this to keep the same token across server restarts."
+    echo "                        Required when WEAVE_HOSTNAME is not localhost/127.0.0.1."
     echo "  WEAVE_DB_PATH         Database file path (default: ~/.weave/fleet.db)"
     echo "  WEAVE_WORKSPACE_ROOT  Workspace root dir (default: ~/.weave/workspaces)"
     echo "  WEAVE_PORT_RANGE_START Override OpenCode port range base (escape hatch)"
@@ -225,11 +228,45 @@ fi
 VERSION="unknown"
 [ -f "$VERSION_FILE" ] && VERSION="$(cat "$VERSION_FILE")"
 
+# ── Authentication setup ────────────────────────────────────────────────────
+# When the server is bound to a non-localhost address, auth is required.
+# Generate a token (or use the user-supplied one) and print the login URL.
+# The token is exported as WEAVE_AUTH_TOKEN so the Node.js process picks it up.
+_is_localhost_binding() {
+  case "$HOSTNAME" in
+    "127.0.0.1"|"localhost"|"::1") return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+if ! _is_localhost_binding; then
+  if [ -z "${WEAVE_AUTH_TOKEN:-}" ]; then
+    # Generate a 128-bit random token (32 hex chars) using openssl or od as fallback
+    if command -v openssl >/dev/null 2>&1; then
+      WEAVE_AUTH_TOKEN="$(openssl rand -hex 16)"
+    else
+      WEAVE_AUTH_TOKEN="$(od -vAn -N16 -tx1 /dev/urandom | tr -d ' \n')"
+    fi
+    export WEAVE_AUTH_TOKEN
+  fi
+  # Determine display hostname for the URL (0.0.0.0 → localhost for clickability)
+  _LOGIN_HOST="$HOSTNAME"
+  [ "$HOSTNAME" = "0.0.0.0" ] && _LOGIN_HOST="localhost"
+  _LOGIN_URL="http://${_LOGIN_HOST}:${PORT}/login?token=${WEAVE_AUTH_TOKEN}"
+fi
+
 # Build startup message — include profile name if non-default
 if [ -n "${WEAVE_PROFILE:-}" ] && [ "$WEAVE_PROFILE" != "default" ]; then
   echo "Weave Fleet v${VERSION} [profile: ${WEAVE_PROFILE}] starting on http://localhost:${PORT}"
 else
   echo "Weave Fleet v${VERSION} starting on http://localhost:${PORT}"
+fi
+
+# Print login URL when auth is required
+if ! _is_localhost_binding; then
+  echo ""
+  echo "  Access Weave Fleet at ${_LOGIN_URL}"
+  echo ""
 fi
 
 # Forward signals to the Node.js process

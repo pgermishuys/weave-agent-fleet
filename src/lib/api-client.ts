@@ -30,12 +30,48 @@ export function apiUrl(path: string): string {
 export const sseUrl = apiUrl;
 
 /**
+ * Redirects the browser to the login page, preserving the current path as returnUrl.
+ * No-op when running server-side (SSR/Node.js context).
+ */
+function redirectToLogin(): void {
+  if (typeof window === "undefined") return;
+  const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+  window.location.href = `/login?returnUrl=${returnUrl}`;
+}
+
+/**
  * Thin wrapper around `fetch()` that prepends the API base URL.
  * Drop-in replacement: `fetch("/api/foo")` → `apiFetch("/api/foo")`.
+ *
+ * On 401 responses: redirects to the login page with the current path as returnUrl,
+ * then throws an error so callers don't attempt to process the unauthorized response.
  */
-export function apiFetch(
+export async function apiFetch(
   path: string,
   init?: RequestInit
 ): Promise<Response> {
-  return fetch(apiUrl(path), init);
+  const response = await fetch(apiUrl(path), init);
+
+  if (response.status === 401) {
+    redirectToLogin();
+    throw new Error("Unauthorized — redirecting to login");
+  }
+
+  return response;
+}
+
+/**
+ * Checks whether the current session is authenticated.
+ * Returns false if auth is not required (localhost) or if the cookie is valid.
+ * Returns true only when auth is required AND the session is not authenticated.
+ */
+export async function isSessionUnauthenticated(): Promise<boolean> {
+  try {
+    const res = await fetch("/api/auth/status");
+    if (!res.ok) return false;
+    const data = await res.json() as { authRequired: boolean; authenticated?: boolean };
+    return data.authRequired === true && data.authenticated === false;
+  } catch {
+    return false;
+  }
 }

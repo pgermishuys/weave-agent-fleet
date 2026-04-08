@@ -118,6 +118,9 @@ echo Environment variables:
 echo   PORT                  Server port (default: 3000)
 echo   WEAVE_PROFILE         Profile name (default: unset = 'default')
 echo   WEAVE_HOSTNAME        Server bind address (default: 0.0.0.0)
+echo   WEAVE_AUTH_TOKEN      Auth token for remote access (default: auto-generated)
+echo                         Set this to keep the same token across server restarts.
+echo                         Required when WEAVE_HOSTNAME is not localhost/127.0.0.1.
 echo   WEAVE_DB_PATH         Database file path (default: %%USERPROFILE%%\.weave\fleet.db)
 echo   WEAVE_WORKSPACE_ROOT  Workspace root dir (default: %%USERPROFILE%%\.weave\workspaces)
 echo   WEAVE_PORT_RANGE_START Override OpenCode port range base (escape hatch)
@@ -225,14 +228,43 @@ if exist "%VERSION_FILE%" (
     set /p VERSION=<"%VERSION_FILE%"
 )
 
+rem ── Authentication setup ────────────────────────────────────────────────────
+rem When the server is bound to a non-localhost address, auth is required.
+rem Generate a token (or use the user-supplied one) and print the login URL.
+rem The token is exported as WEAVE_AUTH_TOKEN so the Node.js process picks it up.
+set "_AUTH_REQUIRED=1"
+if /i "!HOSTNAME!"=="127.0.0.1" set "_AUTH_REQUIRED=0"
+if /i "!HOSTNAME!"=="localhost" set "_AUTH_REQUIRED=0"
+if /i "!HOSTNAME!"=="::1" set "_AUTH_REQUIRED=0"
+
+if "!_AUTH_REQUIRED!"=="1" (
+    if not defined WEAVE_AUTH_TOKEN (
+        rem Generate a 32-character hex token using PowerShell
+        for /f "usebackq delims=" %%T in (
+            `powershell -NoProfile -Command "[System.BitConverter]::ToString([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(16)).Replace('-','').ToLower()"`
+        ) do set "WEAVE_AUTH_TOKEN=%%T"
+    )
+    rem Determine display hostname for the URL (0.0.0.0 → localhost for clickability)
+    set "_LOGIN_HOST=!HOSTNAME!"
+    if "!HOSTNAME!"=="0.0.0.0" set "_LOGIN_HOST=localhost"
+    set "_LOGIN_URL=http://!_LOGIN_HOST!:!PORT!/login?token=!WEAVE_AUTH_TOKEN!"
+)
+
 rem Build startup message — include profile name if non-default
 if defined WEAVE_PROFILE (
     if /i not "!WEAVE_PROFILE!"=="default" (
         echo Weave Fleet v!VERSION! [profile: !WEAVE_PROFILE!] starting on http://localhost:!PORT!
-        goto :launch_server
+        goto :print_login_url
     )
 )
 echo Weave Fleet v!VERSION! starting on http://localhost:!PORT!
+
+:print_login_url
+if "!_AUTH_REQUIRED!"=="1" (
+    echo.
+    echo   Access Weave Fleet at !_LOGIN_URL!
+    echo.
+)
 
 :launch_server
 
