@@ -31,9 +31,6 @@ export const AUTH_COOKIE_MAX_AGE = 3 * 24 * 60 * 60;
 /** Minimum length for a user-provided WEAVE_AUTH_TOKEN (in characters). */
 const MIN_TOKEN_LENGTH = 16;
 
-/** Expected length for an auto-generated token (32 hex chars = 128 bits). */
-const GENERATED_TOKEN_LENGTH = 32;
-
 /** HMAC purpose strings — domain-separated so the same token cannot be used across contexts. */
 const COOKIE_SIGNING_PURPOSE = "weave-cookie-signing-key";
 

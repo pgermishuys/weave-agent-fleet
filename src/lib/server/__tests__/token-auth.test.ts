@@ -16,7 +16,6 @@ import {
   validateCookie,
   validateToken,
   _resetLoginUrlPrintedForTesting,
-  _overrideTokenForTesting,
 } from "../token-auth";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -305,6 +304,7 @@ describe("validateCookie", () => {
 
   it("ReturnsFalseForCookieFromDifferentToken", () => {
     // Simulate a cookie produced with a different token/key using raw crypto
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { createHmac: ch, randomBytes: rb } = require("crypto") as typeof import("crypto");
     const fakeKey = ch("sha256", "different-token").update("weave-cookie-signing-key").digest();
     const nonce = rb(16).toString("hex");

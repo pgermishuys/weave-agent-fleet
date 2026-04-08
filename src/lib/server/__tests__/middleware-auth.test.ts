@@ -14,8 +14,8 @@ import { middleware } from "@/middleware";
 // The module is mocked so each test can set its own auth behavior.
 
 let mockAuthRequired = false;
-let mockValidToken = "test-token-32charshexhexhexhex";
-let mockValidCookieValue = "valid-cookie-value";
+const mockValidToken = "test-token-32charshexhexhexhex";
+const mockValidCookieValue = "valid-cookie-value";
 
 vi.mock("@/lib/server/token-auth", () => ({
   AUTH_COOKIE_NAME: "weave.auth",
