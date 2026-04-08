@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback } from "react";
 import { createPortal } from "react-dom";
 import { GitBranch } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,12 @@ interface SelectionToolbarProps {
   /** Called when the user clicks "Spawn Session". */
   onSpawnClick: (selectedText: string) => void;
 }
+
+// Fixed dimensions for position calculation — the button content is static so
+// these are predictable.  Avoids needing a ref measurement during render.
+const TOOLBAR_WIDTH = 160;
+const TOOLBAR_HEIGHT = 34;
+const GAP = 8;
 
 /**
  * A small floating toolbar that appears near a text selection in the activity
@@ -26,46 +32,34 @@ interface SelectionToolbarProps {
  *   - Flips above the selection when there is insufficient space below
  */
 export function SelectionToolbar({ selection, onSpawnClick }: SelectionToolbarProps) {
-  const toolbarRef = useRef<HTMLDivElement>(null);
-  // Track whether we've rendered at least once so we can measure the toolbar.
-  const [mounted, setMounted] = useState(false);
+  const handleClick = useCallback(() => {
+    if (!selection) return;
+    onSpawnClick(selection.text);
+    // Collapse the browser selection so the toolbar disappears
+    window.getSelection()?.removeAllRanges();
+  }, [selection, onSpawnClick]);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // SSR guard — portals need document.body
+  if (typeof document === "undefined") return null;
+  if (!selection) return null;
 
-  if (!selection || !mounted) return null;
-
-  const { rect, text } = selection;
-
-  // Calculate position — we read from the rendered toolbar width/height if
-  // available, otherwise fall back to sensible estimates.
-  const toolbarWidth = toolbarRef.current?.offsetWidth ?? 160;
-  const toolbarHeight = toolbarRef.current?.offsetHeight ?? 34;
-  const gap = 8;
+  const { rect } = selection;
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
 
-  let top = rect.bottom + gap;
-  let left = rect.left + rect.width / 2 - toolbarWidth / 2;
+  let top = rect.bottom + GAP;
+  let left = rect.left + rect.width / 2 - TOOLBAR_WIDTH / 2;
 
   // Flip above if there is not enough space below
-  if (top + toolbarHeight > viewportHeight - gap) {
-    top = rect.top - toolbarHeight - gap;
+  if (top + TOOLBAR_HEIGHT > viewportHeight - GAP) {
+    top = rect.top - TOOLBAR_HEIGHT - GAP;
   }
 
   // Clamp horizontally
-  left = Math.max(gap, Math.min(left, viewportWidth - toolbarWidth - gap));
-
-  const handleClick = () => {
-    onSpawnClick(text);
-    // Collapse the browser selection so the toolbar disappears
-    window.getSelection()?.removeAllRanges();
-  };
+  left = Math.max(GAP, Math.min(left, viewportWidth - TOOLBAR_WIDTH - GAP));
 
   return createPortal(
     <div
-      ref={toolbarRef}
       className="fixed z-50 animate-in fade-in-0 zoom-in-95 duration-100"
       style={{ top, left }}
     >
