@@ -24,6 +24,7 @@ import {
   getAnySessionForInstance,
   getNonTerminalSessionsForInstance,
   updateSessionForResume,
+  updateSessionInstanceId,
   deleteSession,
   getSessionsForWorkspace,
   insertSessionCallback,
@@ -526,6 +527,49 @@ describe("session repository", () => {
   it("UpdateSessionForResumeIsNoOpForNonexistentSession", () => {
     // Should not throw — updating a non-existent row is a no-op in SQLite
     expect(() => updateSessionForResume("nonexistent-id", "some-inst-id")).not.toThrow();
+  });
+
+  it("UpdateSessionInstanceIdUpdatesOnlyInstanceIdColumn", () => {
+    const { wsId, instId } = setup();
+    const id = mkSessionId();
+    insertSession({ id, workspace_id: wsId, instance_id: instId, opencode_session_id: mkOpencodeSessionId(), directory: "/tmp/proj" });
+    // Put session into stopped state so we can verify status is preserved
+    const stoppedAt = new Date().toISOString();
+    updateSessionStatus(id, "stopped", stoppedAt);
+
+    const newInstId = mkInstanceId();
+    insertInstance({ id: newInstId, port: 4310, directory: "/tmp/proj", url: "http://localhost:4310" });
+    updateSessionInstanceId(id, newInstId);
+
+    const sess = getSession(id);
+    // instance_id updated
+    expect(sess?.instance_id).toBe(newInstId);
+    // status, stopped_at, activity_status, lifecycle_status all preserved
+    expect(sess?.status).toBe("stopped");
+    expect(sess?.stopped_at).toBe(stoppedAt);
+    expect(sess?.activity_status).toBeNull();
+    expect(sess?.lifecycle_status).toBe("stopped");
+  });
+
+  it("UpdateSessionInstanceIdPreservesActiveStatus", () => {
+    const { wsId, instId } = setup();
+    const id = mkSessionId();
+    insertSession({ id, workspace_id: wsId, instance_id: instId, opencode_session_id: mkOpencodeSessionId(), directory: "/tmp/proj" });
+    // Session is active by default after insert
+
+    const newInstId = mkInstanceId();
+    insertInstance({ id: newInstId, port: 4311, directory: "/tmp/proj", url: "http://localhost:4311" });
+    updateSessionInstanceId(id, newInstId);
+
+    const sess = getSession(id);
+    expect(sess?.instance_id).toBe(newInstId);
+    expect(sess?.status).toBe("active");
+    expect(sess?.stopped_at).toBeNull();
+  });
+
+  it("UpdateSessionInstanceIdIsNoOpForNonexistentSession", () => {
+    // Should not throw
+    expect(() => updateSessionInstanceId("nonexistent-id", "some-inst-id")).not.toThrow();
   });
 
   it("GetNonTerminalSessionsForInstanceReturnsActiveIdleAndDisconnected", () => {

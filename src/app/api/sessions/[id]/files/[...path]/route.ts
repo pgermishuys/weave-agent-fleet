@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readFile, writeFile, mkdir, rm, stat, rename, realpath } from "fs/promises";
 import { dirname } from "path";
-import { getInstance } from "@/lib/server/process-manager";
+import { ensureInstanceForSession } from "@/lib/server/opencode-client";
 import {
   validatePathWithinRoot,
   isGitPath,
@@ -28,7 +28,7 @@ export async function GET(
   request: NextRequest,
   context: RouteContext
 ): Promise<NextResponse> {
-  const { id: _sessionId, path: pathSegments } = await context.params;
+  const { id: sessionId, path: pathSegments } = await context.params;
   const instanceId = request.nextUrl.searchParams.get("instanceId");
 
   if (!instanceId) {
@@ -38,8 +38,10 @@ export async function GET(
     );
   }
 
-  const instance = getInstance(instanceId);
-  if (!instance) {
+  let instance;
+  try {
+    ({ instance } = await ensureInstanceForSession(instanceId, sessionId));
+  } catch {
     return NextResponse.json(
       { error: "Instance not found or unavailable" },
       { status: 404 }
@@ -159,7 +161,7 @@ export async function POST(
   request: NextRequest,
   context: RouteContext
 ): Promise<NextResponse> {
-  const { id: _sessionId, path: pathSegments } = await context.params;
+  const { id: sessionId, path: pathSegments } = await context.params;
   const instanceId = request.nextUrl.searchParams.get("instanceId");
 
   if (!instanceId) {
@@ -169,8 +171,10 @@ export async function POST(
     );
   }
 
-  const instance = getInstance(instanceId);
-  if (!instance) {
+  let instance;
+  try {
+    ({ instance } = await ensureInstanceForSession(instanceId, sessionId));
+  } catch {
     return NextResponse.json(
       { error: "Instance not found or unavailable" },
       { status: 404 }
@@ -251,7 +255,7 @@ export async function DELETE(
   request: NextRequest,
   context: RouteContext
 ): Promise<NextResponse> {
-  const { id: _sessionId, path: pathSegments } = await context.params;
+  const { id: sessionId, path: pathSegments } = await context.params;
   const instanceId = request.nextUrl.searchParams.get("instanceId");
 
   if (!instanceId) {
@@ -261,8 +265,10 @@ export async function DELETE(
     );
   }
 
-  const instance = getInstance(instanceId);
-  if (!instance) {
+  let instance;
+  try {
+    ({ instance } = await ensureInstanceForSession(instanceId, sessionId));
+  } catch {
     return NextResponse.json(
       { error: "Instance not found or unavailable" },
       { status: 404 }
@@ -314,7 +320,7 @@ export async function PATCH(
   request: NextRequest,
   context: RouteContext
 ): Promise<NextResponse> {
-  const { id: _sessionId, path: pathSegments } = await context.params;
+  const { id: sessionId, path: pathSegments } = await context.params;
   const instanceId = request.nextUrl.searchParams.get("instanceId");
 
   if (!instanceId) {
@@ -324,8 +330,10 @@ export async function PATCH(
     );
   }
 
-  const instance = getInstance(instanceId);
-  if (!instance) {
+  let instance;
+  try {
+    ({ instance } = await ensureInstanceForSession(instanceId, sessionId));
+  } catch {
     return NextResponse.json(
       { error: "Instance not found or unavailable" },
       { status: 404 }

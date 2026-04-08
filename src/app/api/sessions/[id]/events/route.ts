@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
-import { getInstance, _recoveryComplete } from "@/lib/server/process-manager";
+import { ensureInstanceForSession } from "@/lib/server/opencode-client";
+import { _recoveryComplete } from "@/lib/server/process-manager";
 import { addListener } from "@/lib/server/instance-event-hub";
 import { isRelevantToSession } from "@/lib/event-state";
 import type { SSEEvent } from "@/lib/api-types";
@@ -29,8 +30,10 @@ export async function GET(
   }
 
   // Lookup instance to verify it exists
-  const instance = getInstance(instanceId);
-  if (!instance || instance.status === "dead") {
+  let instance;
+  try {
+    ({ instance } = await ensureInstanceForSession(instanceId, sessionId));
+  } catch {
     return new Response(
       JSON.stringify({ error: "Instance not found or unavailable" }),
       { status: 404, headers: { "Content-Type": "application/json" } }
@@ -80,7 +83,8 @@ export async function GET(
       // Register as a listener on the instance event hub.
       // The hub owns the SDK subscription and handles reconnection transparently.
       // The browser SSE connection survives transient SDK stream interruptions.
-      const unsubscribe = addListener(instanceId, ({ type, properties }) => {
+      // Use instance.id (the live/recovered instance) — not the stale instanceId query param.
+      const unsubscribe = addListener(instance.id, ({ type, properties }) => {
         if (abortController.signal.aborted) return;
 
         // Filter: only forward events relevant to this session

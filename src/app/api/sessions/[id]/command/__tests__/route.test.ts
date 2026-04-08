@@ -8,7 +8,7 @@ vi.mock("@/lib/server/process-manager", () => ({
 }));
 
 vi.mock("@/lib/server/opencode-client", () => ({
-  getClientForInstance: vi.fn(),
+  ensureInstanceForSession: vi.fn(),
 }));
 
 // ─── Imports (after mocks) ────────────────────────────────────────────────────
@@ -16,7 +16,7 @@ vi.mock("@/lib/server/opencode-client", () => ({
 import { POST } from "@/app/api/sessions/[id]/command/route";
 import * as openCodeClient from "@/lib/server/opencode-client";
 
-const mockGetClientForInstance = vi.mocked(openCodeClient.getClientForInstance);
+const mockEnsureInstanceForSession = vi.mocked(openCodeClient.ensureInstanceForSession);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -45,6 +45,13 @@ function makeMockClient() {
     session: {
       command: vi.fn().mockResolvedValue(undefined),
     },
+  };
+}
+
+function makeInstanceResult(client: ReturnType<typeof makeMockClient>) {
+  return {
+    instance: { id: "inst-1", status: "running", directory: "/tmp/proj" },
+    client,
   };
 }
 
@@ -110,9 +117,7 @@ describe("POST /api/sessions/[id]/command", () => {
   });
 
   it("returns 404 when instance not found", async () => {
-    mockGetClientForInstance.mockImplementation(() => {
-      throw new Error("Instance not found");
-    });
+    mockEnsureInstanceForSession.mockRejectedValue(new Error("Instance not found"));
 
     const req = makeRequest({ instanceId: "bad-inst", command: "compact" });
     const res = await POST(req, makeContext());
@@ -124,7 +129,7 @@ describe("POST /api/sessions/[id]/command", () => {
 
   it("returns 200 with success response on valid command", async () => {
     const client = makeMockClient();
-    mockGetClientForInstance.mockReturnValue(client as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(client) as never);
 
     const req = makeRequest({ instanceId: "inst-1", command: "compact" });
     const res = await POST(req, makeContext());
@@ -137,7 +142,7 @@ describe("POST /api/sessions/[id]/command", () => {
 
   it("calls session.command() with command name and empty arguments when no args provided", async () => {
     const client = makeMockClient();
-    mockGetClientForInstance.mockReturnValue(client as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(client) as never);
 
     const req = makeRequest({ instanceId: "inst-1", command: "compact" });
     await POST(req, makeContext());
@@ -151,7 +156,7 @@ describe("POST /api/sessions/[id]/command", () => {
 
   it("calls session.command() with command name and arguments", async () => {
     const client = makeMockClient();
-    mockGetClientForInstance.mockReturnValue(client as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(client) as never);
 
     const req = makeRequest({
       instanceId: "inst-1",
@@ -169,7 +174,7 @@ describe("POST /api/sessions/[id]/command", () => {
 
   it("trims command whitespace", async () => {
     const client = makeMockClient();
-    mockGetClientForInstance.mockReturnValue(client as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(client) as never);
 
     const req = makeRequest({ instanceId: "inst-1", command: "  compact  " });
     await POST(req, makeContext());
@@ -183,7 +188,7 @@ describe("POST /api/sessions/[id]/command", () => {
 
   it("passes agent through to session.command()", async () => {
     const client = makeMockClient();
-    mockGetClientForInstance.mockReturnValue(client as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(client) as never);
 
     const req = makeRequest({
       instanceId: "inst-1",
@@ -202,7 +207,7 @@ describe("POST /api/sessions/[id]/command", () => {
 
   it("passes model as providerID/modelID string to session.command()", async () => {
     const client = makeMockClient();
-    mockGetClientForInstance.mockReturnValue(client as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(client) as never);
 
     const req = makeRequest({
       instanceId: "inst-1",
@@ -221,7 +226,7 @@ describe("POST /api/sessions/[id]/command", () => {
 
   it("passes both agent and model together", async () => {
     const client = makeMockClient();
-    mockGetClientForInstance.mockReturnValue(client as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(client) as never);
 
     const req = makeRequest({
       instanceId: "inst-1",
@@ -247,7 +252,7 @@ describe("POST /api/sessions/[id]/command", () => {
         command: vi.fn().mockRejectedValue(new Error("SDK error")),
       },
     };
-    mockGetClientForInstance.mockReturnValue(client as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(client) as never);
 
     const req = makeRequest({ instanceId: "inst-1", command: "compact" });
     const res = await POST(req, makeContext());
@@ -261,7 +266,7 @@ describe("POST /api/sessions/[id]/command", () => {
 
   it("uses session ID from route params, not request body", async () => {
     const client = makeMockClient();
-    mockGetClientForInstance.mockReturnValue(client as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(client) as never);
 
     const req = makeRequest({ instanceId: "inst-1", command: "compact" });
     await POST(req, makeContext("custom-session-id"));

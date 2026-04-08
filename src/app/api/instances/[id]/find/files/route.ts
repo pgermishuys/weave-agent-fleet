@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getClientForInstance } from "@/lib/server/opencode-client";
+import { ensureInstanceById } from "@/lib/server/opencode-client";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -29,7 +29,7 @@ export async function GET(
 
   let client;
   try {
-    client = getClientForInstance(instanceId);
+    ({ client } = await ensureInstanceById(instanceId));
   } catch {
     return NextResponse.json(
       { error: "Instance not found or unavailable" },

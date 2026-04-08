@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getClientForInstance } from "@/lib/server/opencode-client";
+import { ensureInstanceForSession } from "@/lib/server/opencode-client";
 import { getSessionByOpencodeId, updateSessionStatus } from "@/lib/server/db-repository";
 import { withTimeout, getSDKCallTimeoutMs } from "@/lib/server/async-utils";
 
@@ -24,7 +24,7 @@ export async function POST(
 
   let client;
   try {
-    client = getClientForInstance(instanceId);
+    ({ client } = await ensureInstanceForSession(instanceId, sessionId));
   } catch {
     return NextResponse.json(
       { error: "Instance not found or unavailable" },

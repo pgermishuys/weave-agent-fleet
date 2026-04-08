@@ -4,15 +4,15 @@ import { NextRequest } from "next/server";
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
 vi.mock("@/lib/server/opencode-client", () => ({
-  getClientForInstance: vi.fn(),
+  ensureInstanceForSession: vi.fn(),
 }));
 
 // ─── Imports (after mocks) ────────────────────────────────────────────────────
 
 import { GET } from "@/app/api/sessions/[id]/diffs/route";
-import { getClientForInstance } from "@/lib/server/opencode-client";
+import { ensureInstanceForSession } from "@/lib/server/opencode-client";
 
-const mockGetClientForInstance = vi.mocked(getClientForInstance);
+const mockEnsureInstanceForSession = vi.mocked(ensureInstanceForSession);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -29,6 +29,13 @@ function makeMockClient(diffResponse: { data: unknown[] | null } = { data: [] })
     session: {
       diff: vi.fn().mockResolvedValue(diffResponse),
     },
+  };
+}
+
+function makeInstanceResult(client: ReturnType<typeof makeMockClient>) {
+  return {
+    instance: { id: "inst-abc", status: "running", directory: "/tmp/proj" },
+    client,
   };
 }
 
@@ -51,9 +58,7 @@ describe("GET /api/sessions/[id]/diffs", () => {
   });
 
   it("Returns404WhenGetClientForInstanceThrows", async () => {
-    mockGetClientForInstance.mockImplementation(() => {
-      throw new Error("Instance not found");
-    });
+    mockEnsureInstanceForSession.mockRejectedValue(new Error("Instance not found"));
 
     const req = makeRequest("http://localhost/api/sessions/sess-1/diffs?instanceId=inst-abc");
     const context = makeContext("sess-1");
@@ -71,7 +76,7 @@ describe("GET /api/sessions/[id]/diffs", () => {
         { file: "src/foo.ts", before: "old", after: "new", additions: 5, deletions: 2 },
       ],
     });
-    mockGetClientForInstance.mockReturnValue(client as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(client) as never);
 
     const req = makeRequest("http://localhost/api/sessions/sess-1/diffs?instanceId=inst-abc");
     const context = makeContext("sess-1");
@@ -97,7 +102,7 @@ describe("GET /api/sessions/[id]/diffs", () => {
         { file: "src/new-file.ts", before: "", after: "content", additions: 10, deletions: 0 },
       ],
     });
-    mockGetClientForInstance.mockReturnValue(client as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(client) as never);
 
     const req = makeRequest("http://localhost/api/sessions/sess-1/diffs?instanceId=inst-abc");
     const context = makeContext("sess-1");
@@ -115,7 +120,7 @@ describe("GET /api/sessions/[id]/diffs", () => {
         { file: "src/old-file.ts", before: "content", after: "", additions: 0, deletions: 8 },
       ],
     });
-    mockGetClientForInstance.mockReturnValue(client as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(client) as never);
 
     const req = makeRequest("http://localhost/api/sessions/sess-1/diffs?instanceId=inst-abc");
     const context = makeContext("sess-1");
@@ -133,7 +138,7 @@ describe("GET /api/sessions/[id]/diffs", () => {
         { file: "src/mod.ts", before: "a", after: "b", additions: 1, deletions: 1 },
       ],
     });
-    mockGetClientForInstance.mockReturnValue(client as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(client) as never);
 
     const req = makeRequest("http://localhost/api/sessions/sess-1/diffs?instanceId=inst-abc");
     const context = makeContext("sess-1");
@@ -148,7 +153,7 @@ describe("GET /api/sessions/[id]/diffs", () => {
   it("Returns500WhenClientSessionDiffThrows", async () => {
     const client = makeMockClient();
     client.session.diff = vi.fn().mockRejectedValue(new Error("SDK error"));
-    mockGetClientForInstance.mockReturnValue(client as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(client) as never);
 
     const req = makeRequest("http://localhost/api/sessions/sess-1/diffs?instanceId=inst-abc");
     const context = makeContext("sess-1");
@@ -162,7 +167,7 @@ describe("GET /api/sessions/[id]/diffs", () => {
 
   it("ReturnsEmptyArrayWhenSdkReturnsNullData", async () => {
     const client = makeMockClient({ data: null });
-    mockGetClientForInstance.mockReturnValue(client as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(client) as never);
 
     const req = makeRequest("http://localhost/api/sessions/sess-1/diffs?instanceId=inst-abc");
     const context = makeContext("sess-1");
@@ -176,7 +181,7 @@ describe("GET /api/sessions/[id]/diffs", () => {
 
   it("ReturnsEmptyArrayWhenSdkReturnsEmptyArray", async () => {
     const client = makeMockClient({ data: [] });
-    mockGetClientForInstance.mockReturnValue(client as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(client) as never);
 
     const req = makeRequest("http://localhost/api/sessions/sess-1/diffs?instanceId=inst-abc");
     const context = makeContext("sess-1");
@@ -190,7 +195,7 @@ describe("GET /api/sessions/[id]/diffs", () => {
 
   it("ForwardsMessageIDToSdkWhenProvided", async () => {
     const client = makeMockClient({ data: [] });
-    mockGetClientForInstance.mockReturnValue(client as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(client) as never);
 
     const req = makeRequest("http://localhost/api/sessions/sess-1/diffs?instanceId=inst-abc&messageID=msg-42");
     const context = makeContext("sess-1");
@@ -205,7 +210,7 @@ describe("GET /api/sessions/[id]/diffs", () => {
 
   it("OmitsMessageIDFromSdkCallWhenNotProvided", async () => {
     const client = makeMockClient({ data: [] });
-    mockGetClientForInstance.mockReturnValue(client as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(client) as never);
 
     const req = makeRequest("http://localhost/api/sessions/sess-1/diffs?instanceId=inst-abc");
     const context = makeContext("sess-1");

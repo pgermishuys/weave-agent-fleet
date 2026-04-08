@@ -431,6 +431,20 @@ export function updateSessionForResume(id: string, instanceId: string): void {
 }
 
 /**
+ * Update only the instance_id FK on a session without changing any other fields.
+ *
+ * Used by lazy instance recovery to fix a stale instance reference after a fleet
+ * restart. Unlike updateSessionForResume() — which sets status to 'active' and
+ * is intended for user-initiated resume — this function preserves the session's
+ * current status, stopped_at, and activity/lifecycle columns.
+ */
+export function updateSessionInstanceId(id: string, instanceId: string): void {
+  getDb()
+    .prepare("UPDATE sessions SET instance_id = @instance_id WHERE id = @id")
+    .run({ id, instance_id: instanceId });
+}
+
+/**
  * Get all active (non-idle, non-terminal) child sessions for a parent.
  * Used by session-status-watcher to check if a parent has remaining busy children.
  */

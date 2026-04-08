@@ -30,7 +30,7 @@ vi.mock("@/lib/server/db-repository", () => ({
 }));
 
 vi.mock("@/lib/server/opencode-client", () => ({
-  getClientForInstance: vi.fn(),
+  ensureInstanceForSession: vi.fn(),
 }));
 
 // ─── Imports (after mocks) ────────────────────────────────────────────────────
@@ -46,7 +46,7 @@ const mockGetSessionByOpencodeId = vi.mocked(dbRepository.getSessionByOpencodeId
 const mockGetWorkspace = vi.mocked(dbRepository.getWorkspace);
 const mockGetSessionsForInstance = vi.mocked(dbRepository.getSessionsForInstance);
 const mockGetAnySessionForInstance = vi.mocked(dbRepository.getAnySessionForInstance);
-const mockGetClientForInstance = vi.mocked(opencodeClient.getClientForInstance);
+const mockEnsureInstanceForSession = vi.mocked(opencodeClient.ensureInstanceForSession);
 
 // ─── Shared fixtures ──────────────────────────────────────────────────────────
 
@@ -106,6 +106,13 @@ function makeClient(sessionData: unknown, messagesData: unknown[] = []) {
   };
 }
 
+function makeInstanceResult(client: ReturnType<typeof makeClient>) {
+  return {
+    instance: { id: "inst-abc", status: "running", directory: "/home/user/project" },
+    client,
+  };
+}
+
 // ─── GET /api/sessions/[id] ──────────────────────────────────────────────────
 
 describe("GET /api/sessions/[id]", () => {
@@ -123,9 +130,7 @@ describe("GET /api/sessions/[id]", () => {
   });
 
   it("Returns404WhenInstanceNotFound", async () => {
-    mockGetClientForInstance.mockImplementation(() => {
-      throw new Error("Instance not found");
-    });
+    mockEnsureInstanceForSession.mockRejectedValue(new Error("Instance not found"));
 
     const req = new NextRequest("http://localhost/api/sessions/abc?instanceId=inst-abc");
     const res = await GET(req, makeRouteContext("abc"));
@@ -141,7 +146,7 @@ describe("GET /api/sessions/[id]", () => {
     const dbWorkspace = makeDbWorkspace();
     const client = makeClient(sdkSession);
 
-    mockGetClientForInstance.mockReturnValue(client as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(client) as never);
     mockGetSession.mockReturnValue(undefined as never);
     mockGetSessionByOpencodeId.mockReturnValue(dbSession as never);
     mockGetWorkspace.mockReturnValue(dbWorkspace as never);
@@ -170,7 +175,7 @@ describe("GET /api/sessions/[id]", () => {
     const dbWorkspace = makeDbWorkspace();
     const client = makeClient(sdkSession);
 
-    mockGetClientForInstance.mockReturnValue(client as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(client) as never);
     // Child session is not in DB
     mockGetSession.mockReturnValue(undefined as never);
     mockGetSessionByOpencodeId.mockImplementation((id: string) => {
@@ -205,7 +210,7 @@ describe("GET /api/sessions/[id]", () => {
     const dbWorkspace = makeDbWorkspace();
     const client = makeClient(sdkSession);
 
-    mockGetClientForInstance.mockReturnValue(client as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(client) as never);
     mockGetSession.mockReturnValue(undefined as never);
     // Both child and invalid parent return undefined
     mockGetSessionByOpencodeId.mockReturnValue(undefined as never);
@@ -235,7 +240,7 @@ describe("GET /api/sessions/[id]", () => {
     const dbWorkspace = makeDbWorkspace();
     const client = makeClient(sdkSession);
 
-    mockGetClientForInstance.mockReturnValue(client as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(client) as never);
     mockGetSession.mockReturnValue(undefined as never);
     mockGetSessionByOpencodeId.mockReturnValue(undefined as never);
     mockGetAnySessionForInstance.mockReturnValue(fallbackSession as never);
@@ -264,7 +269,7 @@ describe("GET /api/sessions/[id]", () => {
     });
     const client = makeClient(sdkSession);
 
-    mockGetClientForInstance.mockReturnValue(client as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(client) as never);
     mockGetSession.mockReturnValue(undefined as never);
     mockGetSessionByOpencodeId.mockReturnValue(undefined as never);
     mockGetAnySessionForInstance.mockReturnValue(selfSession as never);
@@ -283,7 +288,7 @@ describe("GET /api/sessions/[id]", () => {
     const sdkSession = makeSdkSession({ id: "child-session" });
     const client = makeClient(sdkSession);
 
-    mockGetClientForInstance.mockReturnValue(client as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(client) as never);
     mockGetSession.mockReturnValue(undefined as never);
     mockGetSessionByOpencodeId.mockReturnValue(undefined as never);
     mockGetAnySessionForInstance.mockReturnValue(undefined as never);
@@ -311,7 +316,7 @@ describe("GET /api/sessions/[id]", () => {
     const dbWorkspace = makeDbWorkspace();
     const client = makeClient(sdkSession);
 
-    mockGetClientForInstance.mockReturnValue(client as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(client) as never);
     mockGetSession.mockReturnValue(undefined as never);
     mockGetSessionByOpencodeId.mockReturnValue(undefined as never);
     // getSessionsForInstance would NOT return stopped sessions — that's the bug we're fixing
@@ -349,7 +354,7 @@ describe("GET /api/sessions/[id]", () => {
     });
     const client = makeClient(sdkSession);
 
-    mockGetClientForInstance.mockReturnValue(client as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(client) as never);
     mockGetSession.mockReturnValue(undefined as never);
     mockGetSessionByOpencodeId.mockImplementation((id: string) => {
       if (id === "child-session") return undefined as never;

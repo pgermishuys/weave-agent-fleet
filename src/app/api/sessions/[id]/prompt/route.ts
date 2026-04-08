@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getClientForInstance } from "@/lib/server/opencode-client";
+import { ensureInstanceForSession } from "@/lib/server/opencode-client";
 import { validateAttachments } from "@/lib/image-validation";
 import type { SendPromptRequest } from "@/lib/api-types";
 import type { TextPartInput, FilePartInput } from "@opencode-ai/sdk/v2";
@@ -55,7 +55,7 @@ export async function POST(
 
   let client;
   try {
-    client = getClientForInstance(instanceId);
+    ({ client } = await ensureInstanceForSession(instanceId, sessionId));
   } catch {
     return NextResponse.json(
       { error: "Instance not found or unavailable" },

@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
-import { getClientForInstance } from "@/lib/server/opencode-client";
-import { getInstance, _recoveryComplete } from "@/lib/server/process-manager";
+import { ensureInstanceForSession } from "@/lib/server/opencode-client";
+import { _recoveryComplete } from "@/lib/server/process-manager";
 import { withTimeout, getSDKCallTimeoutMs } from "@/lib/server/async-utils";
 
 interface RouteContext {
@@ -27,17 +27,10 @@ export async function GET(
 
   // Lookup instance to get directory, then get client — try/catch pattern
   // consistent with [id]/events/route.ts
-  const instance = getInstance(instanceId);
-  if (!instance || instance.status === "dead") {
-    return new Response(
-      JSON.stringify({ error: "Instance not found or unavailable" }),
-      { status: 404, headers: { "Content-Type": "application/json" } }
-    );
-  }
-
   let client;
+  let instance;
   try {
-    client = getClientForInstance(instanceId);
+    ({ client, instance } = await ensureInstanceForSession(instanceId, sessionId));
   } catch {
     return new Response(
       JSON.stringify({ error: "Instance not found or unavailable" }),
