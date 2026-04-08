@@ -156,6 +156,7 @@ export async function GET(
     // Enrich with DB metadata if available
     let workspaceId: string | null = null;
     let workspaceDirectory: string | null = null;
+    let sourceDirectory: string | null = null;
     let isolationStrategy: string | null = null;
     let branch: string | null = null;
     let dbTitle: string | null = null;
@@ -171,6 +172,9 @@ export async function GET(
           workspaceDirectory = ws.directory;
           isolationStrategy = ws.isolation_strategy;
           branch = ws.branch;
+          // For worktree/clone sessions, source_directory is the original repo;
+          // for "existing" sessions it will be null, so fall back to directory.
+          sourceDirectory = ws.source_directory ?? ws.directory;
         }
 
         // Walk parent chain to build ancestors array (root-first)
@@ -212,6 +216,7 @@ export async function GET(
             workspaceDirectory = parentWs.directory;
             isolationStrategy = parentWs.isolation_strategy;
             branch = parentWs.branch;
+            sourceDirectory = parentWs.source_directory ?? parentWs.directory;
           }
         }
       }
@@ -226,6 +231,7 @@ export async function GET(
         messages: messagesResult.data ?? [],
         workspaceId,
         workspaceDirectory,
+        sourceDirectory,
         isolationStrategy,
         branch,
         ancestors,
