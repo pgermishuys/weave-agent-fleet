@@ -114,6 +114,8 @@ async function sha256File(filePath) {
 
 const nodeVersion = readFileSync(join(PROJECT_ROOT, ".node-version"), "utf-8").trim();
 const pkg = JSON.parse(readFileSync(join(PROJECT_ROOT, "package.json"), "utf-8"));
+const updateChannel = process.env.WEAVE_UPDATE_CHANNEL === "dev" ? "dev" : "stable";
+const devBuildId = process.env.WEAVE_DEV_BUILD_ID || process.env.GITHUB_RUN_NUMBER || null;
 
 // Get Rust target triple – honour TAURI_TARGET_TRIPLE when cross-compiling
 // (e.g. building x86_64-apple-darwin on an ARM64 runner).
@@ -125,6 +127,7 @@ const targetTriple = (
 log(`Node.js version: v${nodeVersion}`);
 log(`Rust target triple: ${targetTriple}`);
 log(`Package version: ${pkg.version}`);
+log(`Update channel: ${updateChannel}`);
 
 // Platform mapping: target triple -> Node.js dist info
 const PLATFORM_MAP = {
@@ -150,9 +153,33 @@ log("Step 1: Syncing version to tauri.conf.json...");
 const tauriConfPath = join(PROJECT_ROOT, "src-tauri", "tauri.conf.json");
 const tauriConf = JSON.parse(readFileSync(tauriConfPath, "utf-8"));
 
-tauriConf.version = pkg.version;
+let channelVersion = pkg.version;
+if (updateChannel === "dev") {
+  const rawSuffix = devBuildId || `${Date.now()}`;
+  // MSI pre-release identifiers must be numeric and ≤ 65535.
+  // Modulo the build ID to stay within that limit.
+  const suffix = Number(rawSuffix) ? (Number(rawSuffix) % 65536) : rawSuffix;
+  channelVersion = `${pkg.version}-${suffix}`;
+}
+
+const stableEndpoint =
+  "https://github.com/pgermishuys/weave-agent-fleet/releases/download/v__VERSION__/latest.json";
+const devEndpoint =
+  "https://github.com/pgermishuys/weave-agent-fleet/releases/download/dev/latest.json";
+
+tauriConf.version = channelVersion;
+if (!tauriConf.plugins) {
+  tauriConf.plugins = {};
+}
+if (!tauriConf.plugins.updater) {
+  tauriConf.plugins.updater = {};
+}
+tauriConf.plugins.updater.endpoints = [
+  updateChannel === "dev" ? devEndpoint : stableEndpoint,
+];
 writeFileSync(tauriConfPath, JSON.stringify(tauriConf, null, 2) + "\n");
-log(`  Version synced: ${pkg.version}`);
+log(`  Version synced: ${channelVersion}`);
+log(`  Updater endpoint: ${tauriConf.plugins.updater.endpoints[0]}`);
 
 // ---------------------------------------------------------------------------
 // Step 2: Build Next.js standalone + CLI
@@ -245,7 +272,7 @@ if (existsSync(cliJs)) {
 }
 
 // Write VERSION file
-writeFileSync(join(standaloneDir, "VERSION"), pkg.version);
+writeFileSync(join(standaloneDir, "VERSION"), channelVersion);
 
 // ---------------------------------------------------------------------------
 // Step 4: Normalize standalone to app-bundle

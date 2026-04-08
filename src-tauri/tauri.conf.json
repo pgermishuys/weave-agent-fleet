@@ -11,10 +11,24 @@
   },
   "app": {
     "withGlobalTauri": false,
-    "windows": []
+    "security": {
+      "dangerousDisableAssetCspModification": true
+    },
+    "windows": [
+      {
+        "title": "Weave Fleet",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600,
+        "center": true,
+        "visible": false
+      }
+    ]
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -38,6 +52,14 @@
     },
     "macOS": {
       "minimumSystemVersion": "11.0"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRCRTMwMjEzOUNBODkzQkUKUldTK2s2aWNFd0xqUzloNHJWMytRQ0hLaWJ5SDRjM2pLRTNoNnJscU9zRmczU1d4MFVaTEgvbE4K",
+      "endpoints": [
+        "https://github.com/pgermishuys/weave-agent-fleet/releases/download/v__VERSION__/latest.json"
+      ]
     }
   }
 }

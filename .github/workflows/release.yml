@@ -328,7 +328,7 @@ jobs:
         with:
           releaseId: ${{ needs.release.outputs.release_id }}
           tagName: ${{ github.ref_name }}
-          includeUpdaterJson: false
+          includeUpdaterJson: true
           args: ${{ matrix.args }}
 
   deploy-vanity-url:
