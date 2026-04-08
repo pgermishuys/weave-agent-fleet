@@ -26,6 +26,7 @@ import { useResumeSession } from "@/hooks/use-resume-session";
 import { useDeleteSession } from "@/hooks/use-delete-session";
 import { ConfirmDeleteSessionDialog } from "@/components/fleet/confirm-delete-session-dialog";
 import { ForkSessionDialog } from "@/components/session/fork-session-dialog";
+import { SpawnSessionDialog } from "@/components/session/spawn-session-dialog";
 import { extractLatestTodos } from "@/lib/todo-utils";
 import { TodoSidebarPanel } from "@/components/session/todo-sidebar-panel";
 import { extractPrReferences } from "@/lib/pr-utils";
@@ -56,6 +57,7 @@ interface AncestorInfo {
 interface SessionMetadata {
   workspaceId: string | null;
   workspaceDirectory: string | null;
+  sourceDirectory: string | null;
   isolationStrategy: string | null;
   title?: string;
   createdAt?: number;
@@ -130,6 +132,7 @@ export default function SessionDetailPage() {
   const [isResumable, setIsResumable] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showForkDialog, setShowForkDialog] = useState(false);
+  const [spawnSelection, setSpawnSelection] = useState<string | null>(null);
   const [sessionInfoOpen, setSessionInfoOpen] = useState(false);
   const { isFolded } = useFoldableScreen();
 
@@ -326,6 +329,7 @@ export default function SessionDetailPage() {
   const [metadata, setMetadata] = useState<SessionMetadata>({
     workspaceId: null,
     workspaceDirectory: null,
+    sourceDirectory: null,
     isolationStrategy: null,
   });
   // Track whether metadata has been fetched at least once (distinguishes
@@ -351,12 +355,13 @@ export default function SessionDetailPage() {
         }
         return r.json();
       })
-      .then((data: { workspaceId?: string; workspaceDirectory?: string; isolationStrategy?: string; session?: { title?: string; time?: { created?: number } }; ancestors?: AncestorInfo[]; dbTitle?: string } | null) => {
+      .then((data: { workspaceId?: string; workspaceDirectory?: string; sourceDirectory?: string; isolationStrategy?: string; session?: { title?: string; time?: { created?: number } }; ancestors?: AncestorInfo[]; dbTitle?: string } | null) => {
         if (!data) return;
         metadataFetchedRef.current = true;
         setMetadata({
           workspaceId: data.workspaceId ?? null,
           workspaceDirectory: data.workspaceDirectory ?? null,
+          sourceDirectory: data.sourceDirectory ?? null,
           isolationStrategy: data.isolationStrategy ?? null,
           title: data.dbTitle ?? data.session?.title,
           createdAt: data.session?.time?.created,
@@ -377,6 +382,7 @@ export default function SessionDetailPage() {
     setMetadata({
       workspaceId: null,
       workspaceDirectory: null,
+      sourceDirectory: null,
       isolationStrategy: null,
     });
   }, [sessionId]);
@@ -840,6 +846,7 @@ export default function SessionDetailPage() {
                     cacheHit={cacheHit}
                     initialScrollPosition={initialScrollPosition}
                     suppressAutoScrollRef={suppressAutoScrollRef}
+                    onSpawnFromSelection={setSpawnSelection}
                   />
                 </SlashCommandProvider>
               </div>
@@ -1219,6 +1226,15 @@ export default function SessionDetailPage() {
         sourceSessionTitle={metadata.title}
         open={showForkDialog}
         onOpenChange={setShowForkDialog}
+      />
+
+      <SpawnSessionDialog
+        open={spawnSelection !== null}
+        onOpenChange={(open) => { if (!open) setSpawnSelection(null); }}
+        selectedText={spawnSelection ?? ""}
+        sessionTitle={metadata.title ?? sessionId}
+        sourceSessionId={sessionId}
+        sourceDirectory={metadata.sourceDirectory}
       />
     </div>
   );

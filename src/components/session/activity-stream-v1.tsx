@@ -10,6 +10,7 @@ import { Bot, User, SquareTerminal, Loader2, AlertCircle, RefreshCw, ChevronDown
 import { useScrollAnchor } from "@/hooks/use-scroll-anchor";
 import { useActivityFilter } from "@/hooks/use-activity-filter";
 import { useKeyboardShortcut } from "@/hooks/use-keyboard-shortcut";
+import { useTextSelection } from "@/hooks/use-text-selection";
 import type { AccumulatedMessage, AccumulatedPart, AccumulatedToolPart, AccumulatedFilePart, AutocompleteAgent } from "@/lib/api-types";
 import { isTaskToolCall, getTaskToolInput, getTaskToolSessionId } from "@/lib/api-types";
 import Link from "next/link";
@@ -22,6 +23,7 @@ import { MarkdownRenderer } from "./markdown-renderer";
 import { RelativeTimestamp } from "./relative-timestamp";
 import { ActivityStreamToolbar } from "./activity-stream-toolbar";
 import { ImageLightbox } from "./image-lightbox";
+import { SelectionToolbar } from "./selection-toolbar";
 
 interface ActivityStreamV1Props {
   messages: AccumulatedMessage[];
@@ -69,6 +71,12 @@ interface ActivityStreamV1Props {
    * on the same render cycle.
    */
   suppressAutoScrollRef?: React.MutableRefObject<boolean>;
+  /**
+   * Called when the user selects text in the activity stream and clicks the
+   * floating "Spawn Session" toolbar button.  The parent component uses this
+   * to open the SpawnSessionDialog.
+   */
+  onSpawnFromSelection?: (selectedText: string) => void;
 }
 
 function toTitleCase(s: string): string {
@@ -557,9 +565,17 @@ export function ActivityStreamV1({
   cacheHit,
   initialScrollPosition,
   suppressAutoScrollRef,
+  onSpawnFromSelection,
 }: ActivityStreamV1Props) {
   const { scrollRef, isAtBottom, isNearTop, newMessageCount, scrollToBottom, preserveScrollPosition, getScrollPosition, restoreScrollPosition, suppressAutoScroll: suppressAutoScrollLocalRef, viewportElement } =
     useScrollAnchor({ messageCount: messages.length, externalSuppressAutoScroll: suppressAutoScrollRef });
+
+  // Text selection detection — scoped to the scroll area container.
+  // Only active when a spawn callback is provided (avoids overhead otherwise).
+  const selectionContainerRef = useRef<HTMLElement | null>(null);
+  const selection = useTextSelection(
+    onSpawnFromSelection ? selectionContainerRef : { current: null }
+  );
 
   // Guard against double-firing onLoadOlder while isNearTop stays true
   const hasFiredLoadOlderRef = useRef(false);
@@ -771,7 +787,13 @@ export function ActivityStreamV1({
         />
       )}
 
-      <div className="relative flex-1 min-h-0" ref={scrollRef}>
+      <div
+        className="relative flex-1 min-h-0"
+        ref={(node) => {
+          scrollRef(node);
+          selectionContainerRef.current = node;
+        }}
+      >
         <ScrollArea className="h-full">
           <div>
             {/* Loading indicator for older messages */}
@@ -919,6 +941,14 @@ export function ActivityStreamV1({
               </span>
             )}
           </Button>
+        )}
+
+        {/* Floating "Spawn Session" toolbar — appears near text selections */}
+        {onSpawnFromSelection && (
+          <SelectionToolbar
+            selection={selection}
+            onSpawnClick={onSpawnFromSelection}
+          />
         )}
       </div>
 
