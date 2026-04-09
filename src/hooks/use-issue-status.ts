@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import type { PrReference } from "@/lib/pr-utils";
-import type { PrStatusResponse } from "@/integrations/github/types";
+import type { IssueReference } from "@/lib/issue-utils";
+import type { IssueStatusResponse } from "@/integrations/github/types";
 import { apiFetch } from "@/lib/api-client";
 import {
   updateRateLimit,
@@ -12,9 +12,9 @@ import {
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
-export interface UsePrStatusResult {
-  /** Keyed by PR URL */
-  statuses: Map<string, PrStatusResponse>;
+export interface UseIssueStatusResult {
+  /** Keyed by issue URL */
+  statuses: Map<string, IssueStatusResponse>;
   isLoading: boolean;
   error?: string;
 }
@@ -26,15 +26,15 @@ const BASE_POLL_INTERVAL_MS = 30_000;
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
-/** PRs in terminal states (merged or closed) won't change — no need to keep polling them. */
-function isTerminalState(status: PrStatusResponse): boolean {
-  return status.merged || status.state === "closed";
+/** Issues in closed state are terminal — no need to keep polling. */
+function isTerminalState(status: IssueStatusResponse): boolean {
+  return status.state === "closed";
 }
 
-/** Shallow equality check for two Maps keyed by PR URL. */
+/** Shallow equality check for two Maps keyed by issue URL. */
 function mapsEqual(
-  a: Map<string, PrStatusResponse>,
-  b: Map<string, PrStatusResponse>
+  a: Map<string, IssueStatusResponse>,
+  b: Map<string, IssueStatusResponse>
 ): boolean {
   if (a.size !== b.size) return false;
   for (const [url, aStatus] of a) {
@@ -42,10 +42,8 @@ function mapsEqual(
     if (!bStatus) return false;
     if (
       aStatus.state !== bStatus.state ||
-      aStatus.merged !== bStatus.merged ||
-      aStatus.checksStatus !== bStatus.checksStatus ||
-      aStatus.draft !== bStatus.draft ||
-      aStatus.title !== bStatus.title
+      aStatus.title !== bStatus.title ||
+      aStatus.labels.length !== bStatus.labels.length
     ) {
       return false;
     }
@@ -56,33 +54,32 @@ function mapsEqual(
 // ─── Hook ──────────────────────────────────────────────────────────────────
 
 /**
- * Polls GitHub status for a list of PRs with adaptive rate-limit backoff.
+ * Polls GitHub status for a list of issues with adaptive rate-limit backoff.
  *
  * Base interval is 30 seconds, automatically increased when the GitHub API
  * rate-limit budget is low, and paused entirely when critically low (< 10
  * remaining).
  *
  * Automatically skips polling when:
- *   - the PR list is empty
+ *   - the issue list is empty
  *   - the browser tab is hidden
- *   - all PRs are in terminal states (merged/closed)
+ *   - all issues are in terminal states (closed)
  *   - the rate-limit budget is exhausted
  */
-export function usePrStatus(prs: PrReference[]): UsePrStatusResult {
-  const [statuses, setStatuses] = useState<Map<string, PrStatusResponse>>(
-    () => new Map()
-  );
+export function useIssueStatus(
+  issues: IssueReference[]
+): UseIssueStatusResult {
+  const [statuses, setStatuses] = useState<
+    Map<string, IssueStatusResponse>
+  >(() => new Map());
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
   const isMounted = useRef(true);
-  // Hold latest prs in a ref so fetchStatuses closure doesn't go stale
-  const prsRef = useRef(prs);
-  prsRef.current = prs;
-  // Hold latest statuses in a ref to check terminal states without stale closure
+  const issuesRef = useRef(issues);
+  issuesRef.current = issues;
   const statusesRef = useRef(statuses);
   statusesRef.current = statuses;
-  // Timeout handle for the recursive setTimeout chain
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const scheduleNext = useCallback(() => {
@@ -105,11 +102,14 @@ export function usePrStatus(prs: PrReference[]): UsePrStatusResult {
   }, []);
 
   const fetchAndSchedule = useCallback(async () => {
-    const currentPrs = prsRef.current;
-    if (currentPrs.length === 0) return;
+    const currentIssues = issuesRef.current;
+    if (currentIssues.length === 0) return;
 
-    // Skip when tab is hidden — resume when it becomes visible again
-    if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+    // Skip when tab is hidden
+    if (
+      typeof document !== "undefined" &&
+      document.visibilityState !== "visible"
+    ) {
       scheduleNext();
       return;
     }
@@ -120,26 +120,25 @@ export function usePrStatus(prs: PrReference[]): UsePrStatusResult {
       return;
     }
 
-    // Only poll PRs that are not in a terminal state
-    const prsToFetch = currentPrs.filter((pr) => {
-      const existing = statusesRef.current.get(pr.url);
+    // Only poll issues that are not in a terminal state
+    const issuesToFetch = currentIssues.filter((issue) => {
+      const existing = statusesRef.current.get(issue.url);
       return !existing || !isTerminalState(existing);
     });
 
-    if (prsToFetch.length === 0) return; // All terminal — stop polling
+    if (issuesToFetch.length === 0) return; // All terminal — stop polling
 
     try {
       const results = await Promise.allSettled(
-        prsToFetch.map((pr) =>
+        issuesToFetch.map((issue) =>
           apiFetch(
-            `/api/integrations/github/repos/${pr.owner}/${pr.repo}/pulls/${pr.number}/status`
+            `/api/integrations/github/repos/${issue.owner}/${issue.repo}/issues/${issue.number}/status`
           ).then(async (res) => {
             if (!res.ok) {
-              // Silently ignore auth errors (GitHub not connected)
               if (res.status === 401) return null;
               throw new Error(`HTTP ${res.status}`);
             }
-            return res.json() as Promise<PrStatusResponse>;
+            return res.json() as Promise<IssueStatusResponse>;
           })
         )
       );
@@ -149,28 +148,30 @@ export function usePrStatus(prs: PrReference[]): UsePrStatusResult {
       const newMap = new Map(statusesRef.current);
       let changed = false;
 
-      for (let i = 0; i < prsToFetch.length; i++) {
+      for (let i = 0; i < issuesToFetch.length; i++) {
         const result = results[i];
         if (result.status === "fulfilled" && result.value !== null) {
           const status = result.value;
-          newMap.set(prsToFetch[i].url, status);
+          newMap.set(issuesToFetch[i].url, status);
           changed = true;
 
-          // Feed rate-limit info from the response into the shared tracker
+          // Feed rate-limit info into the shared tracker
           if (
             status.rateLimitRemaining !== undefined &&
             status.rateLimitReset !== undefined
           ) {
-            updateRateLimit(status.rateLimitRemaining, status.rateLimitReset);
+            updateRateLimit(
+              status.rateLimitRemaining,
+              status.rateLimitReset
+            );
           }
         }
       }
 
       if (changed) {
         setStatuses((prev) => {
-          const candidate = newMap;
-          if (mapsEqual(prev, candidate)) return prev;
-          return candidate;
+          if (mapsEqual(prev, newMap)) return prev;
+          return newMap;
         });
         setError(undefined);
       }
@@ -190,7 +191,7 @@ export function usePrStatus(prs: PrReference[]): UsePrStatusResult {
   useEffect(() => {
     isMounted.current = true;
 
-    if (prs.length === 0) {
+    if (issues.length === 0) {
       setIsLoading(false);
       return;
     }
@@ -198,10 +199,8 @@ export function usePrStatus(prs: PrReference[]): UsePrStatusResult {
     setIsLoading(true);
     fetchAndSchedule();
 
-    // Pause/resume polling on visibility change
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        // Cancel any pending timer and fetch immediately
         if (timeoutRef.current !== null) {
           clearTimeout(timeoutRef.current);
           timeoutRef.current = null;
@@ -217,10 +216,13 @@ export function usePrStatus(prs: PrReference[]): UsePrStatusResult {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChange
+      );
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchAndSchedule, prs.length]);
+  }, [fetchAndSchedule, issues.length]);
 
   return { statuses, isLoading, error };
 }
