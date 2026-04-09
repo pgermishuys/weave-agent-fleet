@@ -16,8 +16,8 @@ export interface UseDiffsResult {
  * Call `fetchDiffs()` when the user activates the "Changes" tab.
  * Pass `messageID` to fetch session-scoped diffs (cumulative from that message).
  *
- * `fetchDiffs` is referentially stable — it reads `messageID` from a ref so
- * downstream consumers (effects, callbacks) don't cascade when the mode changes.
+ * `fetchDiffs` identity changes when `messageID` changes, which automatically
+ * triggers a refetch via the effect below.
  */
 export function useDiffs(sessionId: string, instanceId: string, messageID?: string): UseDiffsResult {
   const [diffs, setDiffs] = useState<FileDiffItem[]>([]);
@@ -25,20 +25,13 @@ export function useDiffs(sessionId: string, instanceId: string, messageID?: stri
   const [error, setError] = useState<string | undefined>();
   const isMounted = useRef(true);
 
-  // Keep messageID in a ref so fetchDiffs stays referentially stable
-  const messageIDRef = useRef(messageID);
-  useEffect(() => {
-    messageIDRef.current = messageID;
-  }, [messageID]);
-
   const fetchDiffs = useCallback(async () => {
     if (!sessionId || !instanceId) return;
     setIsLoading(true);
     setError(undefined);
 
     try {
-      const mid = messageIDRef.current;
-      const url = `/api/sessions/${encodeURIComponent(sessionId)}/diffs?instanceId=${encodeURIComponent(instanceId)}${mid ? `&messageID=${encodeURIComponent(mid)}` : ""}`;
+      const url = `/api/sessions/${encodeURIComponent(sessionId)}/diffs?instanceId=${encodeURIComponent(instanceId)}${messageID ? `&messageID=${encodeURIComponent(messageID)}` : ""}`;
       const response = await apiFetch(url);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
@@ -57,14 +50,14 @@ export function useDiffs(sessionId: string, instanceId: string, messageID?: stri
         setIsLoading(false);
       }
     }
-  }, [sessionId, instanceId]);
+  }, [sessionId, instanceId, messageID]);
 
   // Auto-refetch when messageID changes (diff mode toggle)
   useEffect(() => {
     if (sessionId && instanceId) {
       fetchDiffs();
     }
-  }, [messageID, fetchDiffs, sessionId, instanceId]);
+  }, [fetchDiffs, sessionId, instanceId]);
 
   return { diffs, isLoading, error, fetchDiffs };
 }
