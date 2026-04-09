@@ -11,12 +11,21 @@ import { vi, describe, it, expect, beforeEach } from "vitest";
 
 // ─── Mocks (must be before imports of the module under test) ──────────────────
 
-const mockGetInstanceFromPM = vi.fn();
-const mockSpawnInstance = vi.fn();
-const mockGetDbSession = vi.fn();
-const mockGetSessionByOpencodeId = vi.fn();
-const mockGetDbInstance = vi.fn();
-const mockUpdateSessionInstanceId = vi.fn();
+const {
+  mockGetInstanceFromPM,
+  mockSpawnInstance,
+  mockGetDbSession,
+  mockGetSessionByOpencodeId,
+  mockGetDbInstance,
+  mockUpdateSessionInstanceId,
+} = vi.hoisted(() => ({
+  mockGetInstanceFromPM: vi.fn(),
+  mockSpawnInstance: vi.fn(),
+  mockGetDbSession: vi.fn(),
+  mockGetSessionByOpencodeId: vi.fn(),
+  mockGetDbInstance: vi.fn(),
+  mockUpdateSessionInstanceId: vi.fn(),
+}));
 
 vi.mock("@/lib/server/process-manager", () => ({
   getInstance: mockGetInstanceFromPM,
