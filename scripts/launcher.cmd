@@ -239,9 +239,11 @@ if /i "!HOSTNAME!"=="::1" set "_AUTH_REQUIRED=0"
 
 if "!_AUTH_REQUIRED!"=="1" (
     if not defined WEAVE_AUTH_TOKEN (
-        rem Generate a 32-character hex token using PowerShell
+        rem Generate a 32-character hex token using PowerShell.
+        rem RandomNumberGenerator.GetBytes(int) is an instance method, not static —
+        rem we must Create() an instance first, then call GetBytes on the buffer.
         for /f "usebackq delims=" %%T in (
-            `powershell -NoProfile -Command "[System.BitConverter]::ToString([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(16)).Replace('-','').ToLower()"`
+            `powershell -NoProfile -Command "$b=[byte[]]::new(16);[System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b);[System.BitConverter]::ToString($b).Replace('-','').ToLower()"`
         ) do set "WEAVE_AUTH_TOKEN=%%T"
     )
     rem Determine display hostname for the URL (0.0.0.0 → localhost for clickability)
