@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ensureInstanceForSession } from "@/lib/server/opencode-client";
+import { ensureInstanceForSession, getClientForInstance } from "@/lib/server/opencode-client";
 import { destroyInstance, _recoveryComplete } from "@/lib/server/process-manager";
 import {
   getSession,

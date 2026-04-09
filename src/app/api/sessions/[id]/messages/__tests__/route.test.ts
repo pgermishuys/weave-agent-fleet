@@ -155,7 +155,7 @@ describe("GET /api/sessions/[id]/messages", () => {
   });
 
   it("handles empty message array", async () => {
-    mockGetClientForInstance.mockReturnValue(makeMockClient([]) as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(makeMockClient([])) as never);
 
     const req = makeRequest("instanceId=inst-1");
     const res = await GET(req, makeContext());
@@ -240,7 +240,7 @@ describe("GET /api/sessions/[id]/messages", () => {
   });
 
   it("returns ALL messages when after is used with empty message array (stale cursor)", async () => {
-    mockGetClientForInstance.mockReturnValue(makeMockClient([]) as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(makeMockClient([])) as never);
 
     const req = makeRequest("instanceId=inst-1&after=some-cursor");
     const res = await GET(req, makeContext());
