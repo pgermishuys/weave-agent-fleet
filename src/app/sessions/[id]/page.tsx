@@ -587,7 +587,7 @@ export default function SessionDetailPage() {
       <Header
         title={contextTitle || metadata.title || sessionId.slice(0, 12)}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             <span
               className={`h-2 w-2 rounded-full ${
                 sessionStatus === "busy"
@@ -599,26 +599,28 @@ export default function SessionDetailPage() {
               {sessionStatus === "busy" ? "Working" : "Idle"}
             </Badge>
             {activeAgentName && (
-              <Badge variant="outline" className="hidden xs:inline-flex text-xs gap-1">
+              <Badge variant="outline" className="hidden xs:inline-flex text-xs gap-1 max-w-[140px] sm:max-w-[180px] md:max-w-none">
                 <span
-                  className="inline-block h-1.5 w-1.5 rounded-full"
+                  className="inline-block h-1.5 w-1.5 rounded-full shrink-0"
                   style={{ backgroundColor: activeAgentMeta?.color ?? "currentColor" }}
                 />
-                {activeAgentName.charAt(0).toUpperCase() + activeAgentName.slice(1)}
+                <span className="truncate">
+                  {activeAgentName.charAt(0).toUpperCase() + activeAgentName.slice(1)}
+                </span>
               </Badge>
             )}
-            {/* Session Info trigger — mobile only */}
+            {/* Session Info trigger — hidden on md+ where sidebar is available */}
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 w-7 px-0 fold:hidden"
+              className="h-7 w-7 px-0 md:hidden fold:hidden"
               onClick={() => setSessionInfoOpen(true)}
               title="Session info"
               aria-label="Open session info"
             >
               <PanelRight className="h-3.5 w-3.5" />
             </Button>
-            {/* Desktop action buttons */}
+            {/* New context window — icon-only at sm, full text at md */}
             <Button
               variant="ghost"
               size="sm"
@@ -627,8 +629,9 @@ export default function SessionDetailPage() {
               title="New context window — start a fresh session in the same workspace"
             >
               <GitFork className="h-3 w-3" />
-              New context window
+              <span className="hidden md:inline">New context window</span>
             </Button>
+            {/* Interrupt — icon-only at sm, with label at md */}
             {!isStopped && sessionStatus === "busy" && (
               <Button
                 variant={abortConfirm ? "destructive" : "outline"}
@@ -636,9 +639,12 @@ export default function SessionDetailPage() {
                 className="hidden sm:inline-flex h-7 px-2 text-xs gap-1"
                 onClick={handleAbort}
                 disabled={isAborting}
+                title="Interrupt"
               >
                 <OctagonX className="h-3 w-3" />
-                {abortConfirm ? "Confirm interrupt?" : "Interrupt"}
+                <span className="hidden md:inline">
+                  {abortConfirm ? "Confirm interrupt?" : "Interrupt"}
+                </span>
               </Button>
             )}
             {abortConfirm && (
@@ -652,6 +658,7 @@ export default function SessionDetailPage() {
                 Cancel
               </Button>
             )}
+            {/* Stop — icon-only at sm, with label at md */}
             {!isStopped && (
               <Button
                 variant={stopConfirm ? "destructive" : "ghost"}
@@ -659,9 +666,12 @@ export default function SessionDetailPage() {
                 className="hidden sm:inline-flex h-7 px-2 text-xs gap-1"
                 onClick={handleStop}
                 disabled={isTerminating}
+                title="Stop"
               >
                 <Square className="h-3 w-3" />
-                {stopConfirm ? "Confirm stop?" : "Stop"}
+                <span className="hidden md:inline">
+                  {stopConfirm ? "Confirm stop?" : "Stop"}
+                </span>
               </Button>
             )}
             {stopConfirm && (
@@ -681,12 +691,13 @@ export default function SessionDetailPage() {
                 size="sm"
                 className="hidden sm:inline-flex h-7 px-2 text-xs gap-1 text-red-600 dark:text-red-400 hover:text-red-500 hover:bg-red-500/10"
                 onClick={() => setShowDeleteConfirm(true)}
+                title="Delete"
               >
                 <Trash2 className="h-3 w-3" />
-                Delete
+                <span className="hidden md:inline">Delete</span>
               </Button>
             )}
-            {/* Mobile overflow menu */}
+            {/* Mobile overflow menu — visible below sm breakpoint */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
