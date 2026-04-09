@@ -1,12 +1,12 @@
 /**
- * Middleware auth integration tests.
+ * Proxy auth integration tests.
  *
- * Tests the middleware's auth enforcement, CORS handling, and public path bypass.
+ * Tests the proxy's auth enforcement, CORS handling, and public path bypass.
  * The token-auth module is mocked so tests control isAuthRequired/validateToken/validateCookie.
  */
 
 import { NextRequest } from "next/server";
-import { middleware } from "@/middleware";
+import { proxy } from "@/proxy";
 
 // ─── Mock token-auth module ───────────────────────────────────────────────────
 
@@ -60,29 +60,29 @@ describe("Auth disabled (isAuthRequired = false)", () => {
     mockAuthRequired = false;
   });
 
-  it("PassesThroughApiRequests", () => {
+  it("PassesThroughApiRequests", async () => {
     const req = makeRequest("/api/sessions");
-    const res = middleware(req);
+    const res = await proxy(req);
     expect(res.status).not.toBe(401);
     expect(res.headers.get("x-middleware-next")).toBeTruthy();
   });
 
-  it("PassesThroughPageRequests", () => {
+  it("PassesThroughPageRequests", async () => {
     const req = makeRequest("/");
-    const res = middleware(req);
+    const res = await proxy(req);
     expect(res.status).not.toBe(401);
     expect(res.status).not.toBe(302);
   });
 
-  it("AddsCorsWildcardHeader", () => {
+  it("AddsCorsWildcardHeader", async () => {
     const req = makeRequest("/api/sessions", { origin: "http://tauri.localhost" });
-    const res = middleware(req);
+    const res = await proxy(req);
     expect(res.headers.get("access-control-allow-origin")).toBe("*");
   });
 
-  it("HandlesPreflight204", () => {
+  it("HandlesPreflight204", async () => {
     const req = makeRequest("/api/sessions", { method: "OPTIONS" });
-    const res = middleware(req);
+    const res = await proxy(req);
     expect(res.status).toBe(204);
     expect(res.headers.get("access-control-allow-origin")).toBe("*");
   });
@@ -95,56 +95,56 @@ describe("Auth enabled — public paths always accessible", () => {
     mockAuthRequired = true;
   });
 
-  it("AllowsLoginPage", () => {
+  it("AllowsLoginPage", async () => {
     const req = makeRequest("/login");
-    const res = middleware(req);
+    const res = await proxy(req);
     expect(res.status).not.toBe(401);
     expect(res.status).not.toBe(302);
   });
 
-  it("AllowsLoginPageWithQueryParams", () => {
+  it("AllowsLoginPageWithQueryParams", async () => {
     const req = makeRequest("/login?token=abc&returnUrl=/");
-    const res = middleware(req);
+    const res = await proxy(req);
     expect(res.status).not.toBe(401);
     expect(res.status).not.toBe(302);
   });
 
-  it("AllowsAuthLoginEndpoint", () => {
+  it("AllowsAuthLoginEndpoint", async () => {
     const req = makeRequest("/api/auth/login", { method: "POST" });
-    const res = middleware(req);
+    const res = await proxy(req);
     expect(res.status).not.toBe(401);
     expect(res.status).not.toBe(302);
   });
 
-  it("AllowsAuthStatusEndpoint", () => {
+  it("AllowsAuthStatusEndpoint", async () => {
     const req = makeRequest("/api/auth/status");
-    const res = middleware(req);
+    const res = await proxy(req);
     expect(res.status).not.toBe(401);
     expect(res.status).not.toBe(302);
   });
 
-  it("AllowsAuthLogoutEndpoint", () => {
+  it("AllowsAuthLogoutEndpoint", async () => {
     const req = makeRequest("/api/auth/logout", { method: "POST" });
-    const res = middleware(req);
+    const res = await proxy(req);
     expect(res.status).not.toBe(401);
     expect(res.status).not.toBe(302);
   });
 
-  it("AllowsNextJsAssets", () => {
+  it("AllowsNextJsAssets", async () => {
     const req = makeRequest("/_next/webpack-hmr");
-    const res = middleware(req);
+    const res = await proxy(req);
     expect(res.status).not.toBe(401);
   });
 
-  it("AllowsFaviconIco", () => {
+  it("AllowsFaviconIco", async () => {
     const req = makeRequest("/favicon.ico");
-    const res = middleware(req);
+    const res = await proxy(req);
     expect(res.status).not.toBe(401);
   });
 
-  it("AllowsWeaveLogo", () => {
+  it("AllowsWeaveLogo", async () => {
     const req = makeRequest("/weave_logo.png");
-    const res = middleware(req);
+    const res = await proxy(req);
     expect(res.status).not.toBe(401);
   });
 });
@@ -156,40 +156,40 @@ describe("Auth enabled — unauthenticated requests", () => {
     mockAuthRequired = true;
   });
 
-  it("Returns401ForUnauthenticatedApiRequest", () => {
+  it("Returns401ForUnauthenticatedApiRequest", async () => {
     const req = makeRequest("/api/sessions");
-    const res = middleware(req);
+    const res = await proxy(req);
     expect(res.status).toBe(401);
   });
 
   it("Returns401JsonBodyForApiRequest", async () => {
     const req = makeRequest("/api/sessions");
-    const res = middleware(req);
+    const res = await proxy(req);
     expect(res.status).toBe(401);
     const body = await res.json() as { error: string };
     expect(body.error).toBe("Unauthorized");
   });
 
-  it("RedirectsUnauthenticatedPageRequestToLogin", () => {
+  it("RedirectsUnauthenticatedPageRequestToLogin", async () => {
     const req = makeRequest("/");
-    const res = middleware(req);
+    const res = await proxy(req);
     expect(res.status).toBe(307);
     const location = res.headers.get("location") ?? "";
     expect(location).toContain("/login");
     expect(location).toContain("returnUrl");
   });
 
-  it("IncludesReturnUrlInLoginRedirect", () => {
+  it("IncludesReturnUrlInLoginRedirect", async () => {
     const req = makeRequest("/sessions/abc123");
-    const res = middleware(req);
+    const res = await proxy(req);
     expect(res.status).toBe(307);
     const location = res.headers.get("location") ?? "";
     expect(location).toContain("returnUrl=%2Fsessions%2Fabc123");
   });
 
-  it("Returns401WithCorsHeadersOnApiRequest", () => {
+  it("Returns401WithCorsHeadersOnApiRequest", async () => {
     const req = makeRequest("/api/sessions", { origin: "http://remote.host" });
-    const res = middleware(req);
+    const res = await proxy(req);
     expect(res.status).toBe(401);
     // CORS headers should still be present on 401
     expect(res.headers.get("access-control-allow-origin")).toBeTruthy();
@@ -203,28 +203,28 @@ describe("Auth enabled — valid Bearer token", () => {
     mockAuthRequired = true;
   });
 
-  it("PassesRequestWithValidBearerToken", () => {
+  it("PassesRequestWithValidBearerToken", async () => {
     const req = makeRequest("/api/sessions", {
       headers: { authorization: `Bearer ${mockValidToken}` },
     });
-    const res = middleware(req);
+    const res = await proxy(req);
     expect(res.status).not.toBe(401);
     expect(res.headers.get("x-middleware-next")).toBeTruthy();
   });
 
-  it("Rejects401WithInvalidBearerToken", () => {
+  it("Rejects401WithInvalidBearerToken", async () => {
     const req = makeRequest("/api/sessions", {
       headers: { authorization: "Bearer wrong-token-here-1234567890" },
     });
-    const res = middleware(req);
+    const res = await proxy(req);
     expect(res.status).toBe(401);
   });
 
-  it("Rejects401WithMalformedAuthHeader", () => {
+  it("Rejects401WithMalformedAuthHeader", async () => {
     const req = makeRequest("/api/sessions", {
       headers: { authorization: "Basic dXNlcjpwYXNz" },
     });
-    const res = middleware(req);
+    const res = await proxy(req);
     expect(res.status).toBe(401);
   });
 });
@@ -236,34 +236,34 @@ describe("Auth enabled — valid cookie", () => {
     mockAuthRequired = true;
   });
 
-  it("PassesRequestWithValidCookie", () => {
+  it("PassesRequestWithValidCookie", async () => {
     const req = makeRequest("/api/sessions", {
       cookies: { "weave.auth": mockValidCookieValue },
     });
-    const res = middleware(req);
+    const res = await proxy(req);
     expect(res.status).not.toBe(401);
     expect(res.headers.get("x-middleware-next")).toBeTruthy();
   });
 
-  it("Rejects401WithInvalidCookie", () => {
+  it("Rejects401WithInvalidCookie", async () => {
     const req = makeRequest("/api/sessions", {
       cookies: { "weave.auth": "tampered-cookie-value" },
     });
-    const res = middleware(req);
+    const res = await proxy(req);
     expect(res.status).toBe(401);
   });
 
-  it("Rejects401WithExpiredOrMissingCookie", () => {
+  it("Rejects401WithExpiredOrMissingCookie", async () => {
     const req = makeRequest("/api/sessions");
-    const res = middleware(req);
+    const res = await proxy(req);
     expect(res.status).toBe(401);
   });
 
-  it("PassesPageRequestWithValidCookie", () => {
+  it("PassesPageRequestWithValidCookie", async () => {
     const req = makeRequest("/", {
       cookies: { "weave.auth": mockValidCookieValue },
     });
-    const res = middleware(req);
+    const res = await proxy(req);
     expect(res.status).not.toBe(401);
     expect(res.status).not.toBe(302);
     expect(res.status).not.toBe(307);
@@ -277,49 +277,49 @@ describe("CORS headers — auth enabled", () => {
     mockAuthRequired = true;
   });
 
-  it("ReflectsOriginHeaderWhenPresent", () => {
+  it("ReflectsOriginHeaderWhenPresent", async () => {
     const req = makeRequest("/api/sessions", {
       headers: { authorization: `Bearer ${mockValidToken}` },
       origin: "http://remote-client.tailscale.net",
     });
-    const res = middleware(req);
+    const res = await proxy(req);
     expect(res.headers.get("access-control-allow-origin")).toBe(
       "http://remote-client.tailscale.net"
     );
   });
 
-  it("AddsAccessControlAllowCredentials", () => {
+  it("AddsAccessControlAllowCredentials", async () => {
     const req = makeRequest("/api/sessions", {
       headers: { authorization: `Bearer ${mockValidToken}` },
       origin: "http://remote-client.tailscale.net",
     });
-    const res = middleware(req);
+    const res = await proxy(req);
     expect(res.headers.get("access-control-allow-credentials")).toBe("true");
   });
 
-  it("AddsVaryOriginHeader", () => {
+  it("AddsVaryOriginHeader", async () => {
     const req = makeRequest("/api/sessions", {
       headers: { authorization: `Bearer ${mockValidToken}` },
       origin: "http://remote-client.tailscale.net",
     });
-    const res = middleware(req);
+    const res = await proxy(req);
     expect(res.headers.get("vary")).toBe("Origin");
   });
 
-  it("FallsBackToWildcardWhenNoOriginHeader", () => {
+  it("FallsBackToWildcardWhenNoOriginHeader", async () => {
     const req = makeRequest("/api/sessions", {
       headers: { authorization: `Bearer ${mockValidToken}` },
     });
-    const res = middleware(req);
+    const res = await proxy(req);
     expect(res.headers.get("access-control-allow-origin")).toBe("*");
   });
 
-  it("HandlesPreflight204WithCredentials", () => {
+  it("HandlesPreflight204WithCredentials", async () => {
     const req = makeRequest("/api/sessions", {
       method: "OPTIONS",
       origin: "http://remote-client.tailscale.net",
     });
-    const res = middleware(req);
+    const res = await proxy(req);
     expect(res.status).toBe(204);
     expect(res.headers.get("access-control-allow-origin")).toBe(
       "http://remote-client.tailscale.net"

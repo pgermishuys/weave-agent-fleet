@@ -1,41 +1,30 @@
 /**
- * Isolated layout for the login page.
- * Bypasses the main app layout (no sidebar, providers, or data fetching).
- * Uses its own minimal full-screen dark background.
+ * Nested layout for the login page.
+ *
+ * This is a child of the root layout (app/layout.tsx) — it must NOT
+ * re-declare <html> or <body> tags, as the root layout already provides
+ * the document shell.  Re-declaring them causes a hydration mismatch
+ * because the server renders the root layout's <body> classes but the
+ * client sees the login layout's different classes.
+ *
+ * Security: adds <meta name="referrer" content="no-referrer"> to prevent
+ * the auth token in the URL from leaking via the Referer header.
  */
 
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "../globals.css";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Sign In — Weave Fleet",
   description: "Sign in to Weave Agent Fleet",
+  referrer: "no-referrer",
 };
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
 
 export default function LoginLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <html lang="en" className="dark" suppressHydrationWarning>
-      <head>
-        <meta name="referrer" content="no-referrer" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="theme-color" content="#0F172A" />
-      </head>
-      <body className={`${inter.variable} antialiased bg-slate-950`}>
-        {children}
-      </body>
-    </html>
-  );
+  return children;
 }

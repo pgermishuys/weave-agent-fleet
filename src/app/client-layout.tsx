@@ -16,6 +16,7 @@ import { CommandPalette } from "@/components/command-palette";
 import { useRef, useCallback, lazy, Suspense } from "react";
 import { useSidebar } from "@/contexts/sidebar-context";
 import { useVisualViewport } from "@/hooks/use-visual-viewport";
+import { usePathname } from "next/navigation";
 
 // Dynamically import Tauri-only dialog — not needed in mobile web bundle
 const TauriUpdateDialog = lazy(() =>
@@ -65,9 +66,20 @@ function SwipeableLayout({ children }: { children: React.ReactNode }) {
 }
 
 export function ClientLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const isLoginPage = pathname === "/login";
+
   // Keep --visual-vh CSS property in sync with the actual visible viewport
   // (shrinks when the mobile virtual keyboard opens, unlike dvh on Android)
   useVisualViewport();
+
+  // Login page: render children directly without providers, sidebar, or
+  // any components that make authenticated API calls. This prevents the
+  // sidebar/icon rail from showing and avoids spurious 401 errors from
+  // SessionsProvider, SSE hooks, etc. when the user is not yet authenticated.
+  if (isLoginPage) {
+    return <>{children}</>;
+  }
 
   return (
     <ThemeProvider>

@@ -31,10 +31,12 @@ export const sseUrl = apiUrl;
 
 /**
  * Redirects the browser to the login page, preserving the current path as returnUrl.
- * No-op when running server-side (SSR/Node.js context).
+ * No-op when running server-side (SSR/Node.js context) or when already on /login
+ * (prevents redirect loops when ClientLayout providers fire 401s on the login page).
  */
 function redirectToLogin(): void {
   if (typeof window === "undefined") return;
+  if (window.location.pathname === "/login") return;
   const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
   window.location.href = `/login?returnUrl=${returnUrl}`;
 }

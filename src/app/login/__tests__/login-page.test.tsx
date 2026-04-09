@@ -1,8 +1,12 @@
 /**
  * Login page component tests.
  *
- * Mocks next/navigation (useSearchParams, useRouter) and global fetch to isolate
+ * Mocks next/navigation (useSearchParams) and global fetch to isolate
  * the component from network and routing infrastructure.
+ *
+ * Navigation after login uses window.location.href (hard navigation) rather
+ * than router.replace (client-side navigation) to avoid race conditions with
+ * cookie availability. Tests assert on window.location.href assignments.
  */
 
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
@@ -11,11 +15,9 @@ import { vi } from "vitest";
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
-const mockRouterReplace = vi.fn();
 const mockSearchParamsGet = vi.fn();
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace: mockRouterReplace }),
   useSearchParams: () => ({ get: mockSearchParamsGet }),
 }));
 
@@ -62,6 +64,40 @@ function mockWindowHistoryReplaceState() {
   );
 }
 
+/**
+ * Mock window.location so that href assignments are captured.
+ * jsdom doesn't support navigation, so we use a spy-able descriptor.
+ */
+let locationHrefSpy: ReturnType<typeof vi.fn<(url: string) => void>>;
+
+function mockWindowLocation(opts?: { pathname?: string; search?: string; href?: string }) {
+  const pathname = opts?.pathname ?? "/login";
+  const search = opts?.search ?? "";
+  const href = opts?.href ?? `http://localhost:3000${pathname}${search}`;
+  locationHrefSpy = vi.fn();
+
+  // Delete the existing location property so we can redefine it
+  // @ts-expect-error — jsdom location is not configurable by default
+  delete window.location;
+
+  Object.defineProperty(window, "location", {
+    configurable: true,
+    value: {
+      pathname,
+      search,
+      href,
+      get _hrefSetter() { return locationHrefSpy; },
+    },
+  });
+
+  // Make href assignments callable as a setter
+  Object.defineProperty(window.location, "href", {
+    get: () => href,
+    set: (val: string) => locationHrefSpy(val),
+    configurable: true,
+  });
+}
+
 async function renderLoginPage() {
   // Dynamic import so vi.mock() is applied before the module is loaded.
   const { default: LoginPage } = await import("../page");
@@ -76,32 +112,23 @@ async function renderLoginPage() {
 
 beforeEach(() => {
   vi.resetAllMocks();
-  mockRouterReplace.mockReset();
   mockSearchParamsGet.mockReturnValue(null);
   mockWindowHistoryReplaceState();
+  mockWindowLocation();
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("LoginPage — auth not required", () => {
-  it("RedirectsToRootWhenAuthNotRequired", async () => {
+describe("LoginPage — auth not required (legacy — auth is always required now)", () => {
+  // When authRequired=false comes from the status endpoint, the login page
+  // now just shows the form (no redirect). This tests that it doesn't crash.
+  it("ShowsLoginFormWhenAuthStatusSaysNotRequired", async () => {
     mockFetch({ authRequired: false });
     await renderLoginPage();
     await waitFor(() => {
-      expect(mockRouterReplace).toHaveBeenCalledWith("/");
-    });
-  });
-
-  it("RedirectsToReturnUrlWhenAuthNotRequired", async () => {
-    mockFetch({ authRequired: false });
-    mockSearchParamsGet.mockImplementation((key: string) =>
-      key === "returnUrl" ? "/sessions/abc" : null
-    );
-    await renderLoginPage();
-    await waitFor(() => {
-      expect(mockRouterReplace).toHaveBeenCalledWith("/sessions/abc");
+      expect(screen.getByLabelText("Access Token")).toBeTruthy();
     });
   });
 });
@@ -111,7 +138,7 @@ describe("LoginPage — already authenticated", () => {
     mockFetch({ authRequired: true, authenticated: true });
     await renderLoginPage();
     await waitFor(() => {
-      expect(mockRouterReplace).toHaveBeenCalledWith("/");
+      expect(locationHrefSpy).toHaveBeenCalledWith("/");
     });
   });
 
@@ -122,7 +149,7 @@ describe("LoginPage — already authenticated", () => {
     );
     await renderLoginPage();
     await waitFor(() => {
-      expect(mockRouterReplace).toHaveBeenCalledWith("/sessions/abc");
+      expect(locationHrefSpy).toHaveBeenCalledWith("/sessions/abc");
     });
   });
 });
@@ -183,7 +210,7 @@ describe("LoginPage — manual form submission", () => {
     });
 
     await waitFor(() => {
-      expect(mockRouterReplace).toHaveBeenCalledWith("/");
+      expect(locationHrefSpy).toHaveBeenCalledWith("/");
     });
   });
 
@@ -204,7 +231,7 @@ describe("LoginPage — manual form submission", () => {
     });
 
     await waitFor(() => {
-      expect(mockRouterReplace).toHaveBeenCalledWith("/sessions/abc");
+      expect(locationHrefSpy).toHaveBeenCalledWith("/sessions/abc");
     });
   });
 
@@ -256,7 +283,7 @@ describe("LoginPage — auto-submit from URL token", () => {
     await renderLoginPage();
 
     await waitFor(() => {
-      expect(mockRouterReplace).toHaveBeenCalledWith("/");
+      expect(locationHrefSpy).toHaveBeenCalledWith("/");
     });
     // Verify login was called with the URL token
     const fetchMock = vi.mocked(global.fetch);
@@ -280,11 +307,10 @@ describe("LoginPage — auto-submit from URL token", () => {
 
   it("StripsTokenFromUrlAfterAutoSubmit", async () => {
     mockFetch({ authRequired: true, authenticated: false, loginOk: true });
-    // Simulate window.location.search containing token=
-    Object.defineProperty(window, "location", {
-      value: { href: "http://localhost:3000/login?token=abc", search: "?token=abc" },
-      writable: true,
-      configurable: true,
+    mockWindowLocation({
+      pathname: "/login",
+      search: "?token=abc",
+      href: "http://localhost:3000/login?token=abc",
     });
     mockSearchParamsGet.mockImplementation((key: string) =>
       key === "token" ? "url-token-value" : null
@@ -300,35 +326,36 @@ describe("LoginPage — auto-submit from URL token", () => {
 
 describe("LoginPage — returnUrl open redirect protection", () => {
   it("RedirectsToRootForAbsoluteReturnUrl", async () => {
-    mockFetch({ authRequired: false });
+    // Use authenticated: true to trigger the redirect path (getSafeReturnUrl)
+    mockFetch({ authRequired: true, authenticated: true });
     mockSearchParamsGet.mockImplementation((key: string) =>
       key === "returnUrl" ? "https://evil.com/steal" : null
     );
     await renderLoginPage();
     await waitFor(() => {
-      expect(mockRouterReplace).toHaveBeenCalledWith("/");
+      expect(locationHrefSpy).toHaveBeenCalledWith("/");
     });
   });
 
   it("RedirectsToRootForProtocolRelativeReturnUrl", async () => {
-    mockFetch({ authRequired: false });
+    mockFetch({ authRequired: true, authenticated: true });
     mockSearchParamsGet.mockImplementation((key: string) =>
       key === "returnUrl" ? "//evil.com/steal" : null
     );
     await renderLoginPage();
     await waitFor(() => {
-      expect(mockRouterReplace).toHaveBeenCalledWith("/");
+      expect(locationHrefSpy).toHaveBeenCalledWith("/");
     });
   });
 
   it("AllowsValidRelativeReturnUrl", async () => {
-    mockFetch({ authRequired: false });
+    mockFetch({ authRequired: true, authenticated: true });
     mockSearchParamsGet.mockImplementation((key: string) =>
       key === "returnUrl" ? "/sessions/abc-123" : null
     );
     await renderLoginPage();
     await waitFor(() => {
-      expect(mockRouterReplace).toHaveBeenCalledWith("/sessions/abc-123");
+      expect(locationHrefSpy).toHaveBeenCalledWith("/sessions/abc-123");
     });
   });
 });
