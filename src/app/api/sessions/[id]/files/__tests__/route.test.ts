@@ -6,8 +6,8 @@ import { join } from "path";
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
-vi.mock("@/lib/server/process-manager", () => ({
-  getInstance: vi.fn(),
+vi.mock("@/lib/server/opencode-client", () => ({
+  ensureInstanceForSession: vi.fn(),
 }));
 
 // ─── Imports (after mocks) ─────────────────────────────────────────────────────
@@ -19,9 +19,9 @@ import {
   DELETE as deleteHandler,
   PATCH as patchHandler,
 } from "@/app/api/sessions/[id]/files/[...path]/route";
-import { getInstance } from "@/lib/server/process-manager";
+import { ensureInstanceForSession } from "@/lib/server/opencode-client";
 
-const mockGetInstance = vi.mocked(getInstance);
+const mockEnsureInstanceForSession = vi.mocked(ensureInstanceForSession);
 
 // ─── Real temp workspace ───────────────────────────────────────────────────────
 
@@ -29,7 +29,7 @@ let tmpRoot: string;
 
 beforeEach(async () => {
   tmpRoot = await mkdtemp(join(tmpdir(), "files-route-test-"));
-  mockGetInstance.mockReturnValue({ directory: tmpRoot } as ReturnType<typeof getInstance>);
+  mockEnsureInstanceForSession.mockResolvedValue({ instance: { directory: tmpRoot } as never, client: {} as never });
 });
 
 afterEach(async () => {
@@ -81,7 +81,7 @@ describe("GET /api/sessions/[id]/files — file listing", () => {
   });
 
   it("Returns404WhenInstanceNotFound", async () => {
-    mockGetInstance.mockReturnValue(undefined);
+    mockEnsureInstanceForSession.mockRejectedValue(new Error("Instance not found"));
     const res = await listGET(makeListRequest("inst-x"), makeListContext());
     const body = await res.json();
     expect(res.status).toBe(404);
@@ -154,7 +154,7 @@ describe("GET /api/sessions/[id]/files/[...path] — file read", () => {
   });
 
   it("Returns404WhenInstanceNotFound", async () => {
-    mockGetInstance.mockReturnValue(undefined);
+    mockEnsureInstanceForSession.mockRejectedValue(new Error("Instance not found"));
     const res = await readGET(
       makeReadRequest("src/index.ts", "inst-1"),
       makeFileContext("sess-1", ["src", "index.ts"])
@@ -265,7 +265,7 @@ describe("POST /api/sessions/[id]/files/[...path] — file write", () => {
   });
 
   it("Returns404WhenInstanceNotFound", async () => {
-    mockGetInstance.mockReturnValue(undefined);
+    mockEnsureInstanceForSession.mockRejectedValue(new Error("Instance not found"));
     const req = makeWriteRequest("src/new.ts", "inst-1", "content");
     const res = await writeGET(req, makeFileContext("sess-1", ["src", "new.ts"]));
     expect(res.status).toBe(404);
@@ -396,7 +396,7 @@ describe("DELETE /api/sessions/[id]/files/[...path]", () => {
   });
 
   it("Returns404WhenInstanceNotFound", async () => {
-    mockGetInstance.mockReturnValue(undefined);
+    mockEnsureInstanceForSession.mockRejectedValue(new Error("Instance not found"));
     const res = await deleteHandler(
       makeDeleteRequest("file.ts", "inst-1"),
       makeFileContext("sess-1", ["file.ts"])
@@ -499,7 +499,7 @@ describe("PATCH /api/sessions/[id]/files/[...path]", () => {
   });
 
   it("Returns404WhenInstanceNotFound", async () => {
-    mockGetInstance.mockReturnValue(undefined);
+    mockEnsureInstanceForSession.mockRejectedValue(new Error("Instance not found"));
     const res = await patchHandler(
       makePatchRequest("old.ts", "inst-1", "new.ts"),
       makeFileContext("sess-1", ["old.ts"])
