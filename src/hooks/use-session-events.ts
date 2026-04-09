@@ -322,7 +322,7 @@ export function useSessionEvents(
       void isSessionUnauthenticated().then((unauthenticated) => {
         if (!isMounted.current) return;
         if (unauthenticated) {
-          if (typeof window !== "undefined") {
+          if (typeof window !== "undefined" && window.location.pathname !== "/login") {
             const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
             window.location.href = `/login?returnUrl=${returnUrl}`;
           }

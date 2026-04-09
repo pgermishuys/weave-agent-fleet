@@ -1,5 +1,5 @@
 /**
- * Next.js middleware — centralized authentication and CORS enforcement.
+ * Next.js proxy — centralized authentication and CORS enforcement.
  *
  * This is the single enforcement point for all routes. It runs before every
  * request, providing:
@@ -26,6 +26,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   isAuthRequired,
+  getAuthToken,
   validateToken,
   validateCookie,
   AUTH_COOKIE_NAME,
@@ -108,9 +109,20 @@ function isSafeReturnUrl(url: string): boolean {
   return url.startsWith("/") && !url.startsWith("//") && !url.includes("://");
 }
 
-// ─── Middleware ───────────────────────────────────────────────────────────────
+// ─── Proxy ───────────────────────────────────────────────────────────────────
 
-export function middleware(request: NextRequest): NextResponse {
+// Log the login URL on first request when auth is required.
+// This ensures developers see the token when running `bun run dev` directly
+// (without the launcher scripts which handle this externally).
+// Done lazily (not at module load) to avoid issues with test mocking.
+let _initialized = false;
+
+export async function proxy(request: NextRequest): Promise<NextResponse> {
+  if (!_initialized) {
+    _initialized = true;
+    getAuthToken();
+  }
+
   const { pathname } = request.nextUrl;
 
   // ── Preflight (OPTIONS) ─────────────────────────────────────────────────────
@@ -135,7 +147,7 @@ export function middleware(request: NextRequest): NextResponse {
     return response;
   }
 
-  // ── Auth disabled (localhost) — pass through all requests ──────────────────
+  // ── Auth not required — pass through all requests ─────────────────────────
   if (!authRequired) {
     const response = NextResponse.next();
     for (const [key, value] of Object.entries(corsHeaders)) {
@@ -150,7 +162,7 @@ export function middleware(request: NextRequest): NextResponse {
   const authHeader = request.headers.get("authorization");
   if (authHeader?.startsWith("Bearer ")) {
     const candidateToken = authHeader.slice("Bearer ".length).trim();
-    if (validateToken(candidateToken)) {
+    if (await validateToken(candidateToken)) {
       const response = NextResponse.next();
       for (const [key, value] of Object.entries(corsHeaders)) {
         response.headers.set(key, value);
@@ -161,7 +173,7 @@ export function middleware(request: NextRequest): NextResponse {
 
   // 2. Check session cookie (for browser requests, SSE streams)
   const cookieValue = request.cookies.get(AUTH_COOKIE_NAME)?.value;
-  if (cookieValue && validateCookie(cookieValue)) {
+  if (cookieValue && await validateCookie(cookieValue)) {
     const response = NextResponse.next();
     for (const [key, value] of Object.entries(corsHeaders)) {
       response.headers.set(key, value);
@@ -171,9 +183,14 @@ export function middleware(request: NextRequest): NextResponse {
 
   // ── Not authenticated ───────────────────────────────────────────────────────
 
+  // If a stale/invalid cookie is present, clear it so the browser stops sending
+  // it on every subsequent request. Without this, server restarts (which change
+  // the signing key) leave the old cookie lingering indefinitely.
+  const hasStaleCookie = !!cookieValue;
+
   // API routes → 401 JSON response
   if (pathname.startsWith("/api/")) {
-    return new NextResponse(
+    const response = new NextResponse(
       JSON.stringify({ error: "Unauthorized" }),
       {
         status: 401,
@@ -183,21 +200,43 @@ export function middleware(request: NextRequest): NextResponse {
         },
       }
     );
+    if (hasStaleCookie) {
+      response.cookies.set(AUTH_COOKIE_NAME, "", {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: false,
+        path: "/",
+        maxAge: 0,
+      });
+    }
+    return response;
   }
 
   // Page routes → redirect to /login with returnUrl
+  // Guard against redirect loops: never set a returnUrl pointing back to /login.
   const returnUrl = pathname + request.nextUrl.search;
-  const safeReturnUrl = isSafeReturnUrl(returnUrl) ? returnUrl : "/";
   const loginUrl = new URL("/login", request.url);
-  loginUrl.searchParams.set("returnUrl", safeReturnUrl);
+  if (isSafeReturnUrl(returnUrl) && !pathname.startsWith("/login")) {
+    loginUrl.searchParams.set("returnUrl", returnUrl);
+  }
 
-  return NextResponse.redirect(loginUrl);
+  const redirectResponse = NextResponse.redirect(loginUrl);
+  if (hasStaleCookie) {
+    redirectResponse.cookies.set(AUTH_COOKIE_NAME, "", {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: false,
+      path: "/",
+      maxAge: 0,
+    });
+  }
+  return redirectResponse;
 }
 
 // ─── Matcher config ───────────────────────────────────────────────────────────
 
 /**
- * Run middleware on all routes except Next.js static assets and image optimization.
+ * Run proxy on all routes except Next.js static assets and image optimization.
  * These are handled by Next.js itself and don't need auth or CORS.
  */
 export const config = {

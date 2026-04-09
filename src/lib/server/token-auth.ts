@@ -12,13 +12,15 @@
  *   - With WEAVE_AUTH_TOKEN set: the token is stable across restarts; cookies remain valid.
  *
  * Security notes:
- *   - All token comparisons use crypto.timingSafeEqual to prevent timing attacks.
+ *   - All token comparisons use constant-time comparison to prevent timing attacks.
  *   - Cookie value is HMAC-SHA256(nonce, signingKey) where signingKey = HMAC-SHA256(token, purpose).
  *     This prevents cookie forgery without requiring server-side session storage.
  *   - Token is logged to the console on first use when auth is required (same pattern as Aspire).
+ *
+ * Edge Runtime compatibility:
+ *   - Uses the Web Crypto API (crypto.subtle + crypto.getRandomValues) instead of Node.js crypto.
+ *   - All HMAC operations are async (Web Crypto is promise-based).
  */
-
-import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -34,14 +36,68 @@ const MIN_TOKEN_LENGTH = 16;
 /** HMAC purpose strings — domain-separated so the same token cannot be used across contexts. */
 const COOKIE_SIGNING_PURPOSE = "weave-cookie-signing-key";
 
-// ─── Module initialization ────────────────────────────────────────────────────
+// ─── Web Crypto helpers ───────────────────────────────────────────────────────
+
+const encoder = new TextEncoder();
+
+/** Convert a Uint8Array to a lowercase hex string. */
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
 
 /**
- * Generates a 128-bit cryptographically random token encoded as 32 lowercase hex characters.
+ * Generates a cryptographically random hex string using Web Crypto.
+ * @param byteLength Number of random bytes (output hex string is 2× this length).
  */
-function generateToken(): string {
-  return randomBytes(16).toString("hex");
+function randomHex(byteLength: number): string {
+  const bytes = new Uint8Array(byteLength);
+  crypto.getRandomValues(bytes);
+  return bytesToHex(bytes);
 }
+
+/**
+ * Computes HMAC-SHA256(data, key) using Web Crypto.
+ * Returns the raw digest as a Uint8Array.
+ */
+async function hmacSha256(
+  key: Uint8Array | string,
+  data: string
+): Promise<Uint8Array> {
+  const keyBytes = typeof key === "string" ? encoder.encode(key) : key;
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    keyBytes as BufferSource,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const dataBytes = encoder.encode(data);
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    cryptoKey,
+    dataBytes as BufferSource
+  );
+  return new Uint8Array(signature);
+}
+
+/**
+ * Constant-time comparison of two Uint8Arrays.
+ * Returns true only if they are equal in length and content.
+ */
+function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a[i] ^ b[i];
+  }
+  return result === 0;
+}
+
+// ─── Module initialization ────────────────────────────────────────────────────
 
 /**
  * Validates a user-provided token from WEAVE_AUTH_TOKEN.
@@ -55,11 +111,6 @@ function validateEnvToken(token: string): void {
   }
 }
 
-/**
- * Localhost addresses that indicate local-only binding (auth not required).
- */
-const LOCALHOST_ADDRESSES = new Set(["127.0.0.1", "localhost", "::1", "0:0:0:0:0:0:0:1"]);
-
 /** The active auth token — generated once at module load time. */
 let _token: string;
 
@@ -68,16 +119,21 @@ if (envToken) {
   validateEnvToken(envToken);
   _token = envToken;
 } else {
-  _token = generateToken();
+  _token = randomHex(16);
 }
 
 /**
  * The HMAC signing key derived from the token, used to sign and verify cookies.
- * Derived once so the derivation cost is paid at startup, not per-request.
+ * Derived lazily on first use because Web Crypto is async.
  */
-const _signingKey = createHmac("sha256", _token)
-  .update(COOKIE_SIGNING_PURPOSE)
-  .digest();
+let _signingKeyPromise: Promise<Uint8Array> | null = null;
+
+function getSigningKey(): Promise<Uint8Array> {
+  if (!_signingKeyPromise) {
+    _signingKeyPromise = hmacSha256(_token, COOKIE_SIGNING_PURPOSE);
+  }
+  return _signingKeyPromise;
+}
 
 /** Whether the login URL has been printed to the console (logged once). */
 let _loginUrlPrinted = false;
@@ -86,23 +142,19 @@ let _loginUrlPrinted = false;
 
 /**
  * Returns true when authentication is required.
- * Auth is required when the server is bound to a non-localhost address.
- *
- * Reads the HOSTNAME env var (set by the launcher or Next.js directly).
- * Returns false for 127.0.0.1, localhost, and ::1; true for everything else
- * (e.g. 0.0.0.0, a LAN IP, a Tailscale IP).
+ * Auth is always required — token authentication protects all bindings
+ * including localhost.
  */
 export function isAuthRequired(): boolean {
-  const hostname = process.env.HOSTNAME ?? "";
-  return !LOCALHOST_ADDRESSES.has(hostname);
+  return true;
 }
 
 /**
  * Returns the active auth token.
- * On first call when auth is required, prints the login URL to the console.
+ * On first call, prints the login URL to the console.
  */
 export function getAuthToken(): string {
-  if (isAuthRequired() && !_loginUrlPrinted) {
+  if (!_loginUrlPrinted) {
     _loginUrlPrinted = true;
     console.log(`\n  Access Weave Fleet at ${getLoginUrl()}\n`);
   }
@@ -122,23 +174,22 @@ export function getLoginUrl(): string {
 }
 
 /**
- * Validates a candidate token using a timing-safe comparison.
+ * Validates a candidate token using a constant-time comparison.
  * Returns true only if the candidate exactly matches the active token.
  *
- * Both inputs are SHA-256 hashed before comparison so that:
- *   1. The comparison is always performed on equal-length buffers (required by timingSafeEqual).
+ * Both inputs are HMAC-SHA256 hashed before comparison so that:
+ *   1. The comparison is always performed on equal-length buffers.
  *   2. The HMAC output length is fixed regardless of candidate length.
  */
-export function validateToken(candidate: string): boolean {
+export async function validateToken(candidate: string): Promise<boolean> {
   if (typeof candidate !== "string" || candidate.length === 0) {
     return false;
   }
   try {
-    // Hash both values with HMAC-SHA256 keyed with the signing key.
-    // This normalises length (always 32 bytes) and preserves timing-safety.
-    const expected = createHmac("sha256", _signingKey).update(_token).digest();
-    const actual = createHmac("sha256", _signingKey).update(candidate).digest();
-    return timingSafeEqual(expected, actual);
+    const signingKey = await getSigningKey();
+    const expected = await hmacSha256(signingKey, _token);
+    const actual = await hmacSha256(signingKey, candidate);
+    return constantTimeEqual(expected, actual);
   } catch {
     return false;
   }
@@ -152,9 +203,11 @@ export function validateToken(candidate: string): boolean {
  * The HMAC is HMAC-SHA256(nonce, _signingKey) encoded as hex (64 chars).
  * Total value length: 97 chars (<nonce>.<hmac>).
  */
-export function createCookieValue(): string {
-  const nonce = randomBytes(16).toString("hex");
-  const hmac = createHmac("sha256", _signingKey).update(nonce).digest("hex");
+export async function createCookieValue(): Promise<string> {
+  const nonce = randomHex(16);
+  const signingKey = await getSigningKey();
+  const hmacBytes = await hmacSha256(signingKey, nonce);
+  const hmac = bytesToHex(hmacBytes);
   return `${nonce}.${hmac}`;
 }
 
@@ -163,7 +216,7 @@ export function createCookieValue(): string {
  * Returns true only if the cookie was created by this server instance
  * (i.e. the HMAC is valid for the nonce).
  */
-export function validateCookie(cookieValue: string): boolean {
+export async function validateCookie(cookieValue: string): Promise<boolean> {
   if (typeof cookieValue !== "string" || !cookieValue.includes(".")) {
     return false;
   }
@@ -176,20 +229,20 @@ export function validateCookie(cookieValue: string): boolean {
   }
 
   try {
-    const expectedHmac = createHmac("sha256", _signingKey)
-      .update(nonce)
-      .digest("hex");
-    const expectedBuf = Buffer.from(expectedHmac, "utf8");
-    const suppliedBuf = Buffer.from(suppliedHmac, "utf8");
+    const signingKey = await getSigningKey();
+    const expectedHmacBytes = await hmacSha256(signingKey, nonce);
+    const expectedHmac = bytesToHex(expectedHmacBytes);
 
-    // timingSafeEqual requires equal-length buffers.
+    const expectedBytes = encoder.encode(expectedHmac);
+    const suppliedBytes = encoder.encode(suppliedHmac);
+
     // If lengths differ, the HMAC is clearly invalid — reject immediately.
     // Note: length comparison here is safe because HMAC output length is not secret
     // (it's always 64 hex chars for SHA-256).
-    if (expectedBuf.length !== suppliedBuf.length) {
+    if (expectedBytes.length !== suppliedBytes.length) {
       return false;
     }
-    return timingSafeEqual(expectedBuf, suppliedBuf);
+    return constantTimeEqual(expectedBytes, suppliedBytes);
   } catch {
     return false;
   }
@@ -205,4 +258,6 @@ export function _resetLoginUrlPrintedForTesting(): void {
 /** @internal Override the token (for testing env var scenarios only). */
 export function _overrideTokenForTesting(newToken: string): void {
   _token = newToken;
+  // Reset the signing key so it's re-derived from the new token
+  _signingKeyPromise = null;
 }

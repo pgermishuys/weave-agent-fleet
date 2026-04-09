@@ -42,12 +42,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const candidate = (body as { token: string }).token;
 
-  if (!validateToken(candidate)) {
+  if (!await validateToken(candidate)) {
     return NextResponse.json({ error: "Invalid token" }, { status: 401 });
   }
 
   // Token is valid — create a signed cookie value and set it in the response
-  const cookieValue = createCookieValue();
+  const cookieValue = await createCookieValue();
 
   const response = NextResponse.json({ ok: true });
 

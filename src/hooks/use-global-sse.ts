@@ -85,7 +85,7 @@ function handleError(): void {
     // rather than reconnecting indefinitely.
     void isSessionUnauthenticated().then((unauthenticated) => {
       if (unauthenticated) {
-        if (typeof window !== "undefined") {
+        if (typeof window !== "undefined" && window.location.pathname !== "/login") {
           const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
           window.location.href = `/login?returnUrl=${returnUrl}`;
         }

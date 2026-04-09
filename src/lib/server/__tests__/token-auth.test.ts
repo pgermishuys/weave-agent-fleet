@@ -63,55 +63,20 @@ describe("AUTH_COOKIE_MAX_AGE", () => {
 // ─── isAuthRequired ───────────────────────────────────────────────────────────
 
 describe("isAuthRequired", () => {
-  it("ReturnsFalseForLocalhostAddress", () => {
+  it("AlwaysReturnsTrue", () => {
+    // Auth is always required regardless of hostname
     withEnv({ HOSTNAME: "localhost" }, () => {
-      expect(isAuthRequired()).toBe(false);
+      expect(isAuthRequired()).toBe(true);
     });
-  });
-
-  it("ReturnsFalseFor127001", () => {
     withEnv({ HOSTNAME: "127.0.0.1" }, () => {
-      expect(isAuthRequired()).toBe(false);
+      expect(isAuthRequired()).toBe(true);
     });
-  });
-
-  it("ReturnsFalseForIPv6Loopback", () => {
-    withEnv({ HOSTNAME: "::1" }, () => {
-      expect(isAuthRequired()).toBe(false);
-    });
-  });
-
-  it("ReturnsFalseForIPv6LoopbackLong", () => {
-    withEnv({ HOSTNAME: "0:0:0:0:0:0:0:1" }, () => {
-      expect(isAuthRequired()).toBe(false);
-    });
-  });
-
-  it("ReturnsTrueForAllInterfaces", () => {
     withEnv({ HOSTNAME: "0.0.0.0" }, () => {
       expect(isAuthRequired()).toBe(true);
     });
-  });
-
-  it("ReturnsTrueForLanIP", () => {
-    withEnv({ HOSTNAME: "192.168.1.100" }, () => {
-      expect(isAuthRequired()).toBe(true);
-    });
-  });
-
-  it("ReturnsTrueForTailscaleIP", () => {
-    withEnv({ HOSTNAME: "100.64.0.1" }, () => {
-      expect(isAuthRequired()).toBe(true);
-    });
-  });
-
-  it("ReturnsTrueForEmptyHostname", () => {
     withEnv({ HOSTNAME: "" }, () => {
       expect(isAuthRequired()).toBe(true);
     });
-  });
-
-  it("ReturnsTrueWhenHostnameUnset", () => {
     withEnv({ HOSTNAME: undefined }, () => {
       expect(isAuthRequired()).toBe(true);
     });
@@ -132,11 +97,11 @@ describe("getAuthToken", () => {
     expect(first).toBe(second);
   });
 
-  it("PrintsLoginUrlToConsoleOnFirstCallWhenAuthRequired", () => {
+  it("PrintsLoginUrlToConsoleOnFirstCall", () => {
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     _resetLoginUrlPrintedForTesting();
 
-    withEnv({ HOSTNAME: "0.0.0.0", PORT: "3000" }, () => {
+    withEnv({ PORT: "3000" }, () => {
       getAuthToken();
       expect(consoleSpy).toHaveBeenCalledOnce();
       const logged = consoleSpy.mock.calls[0][0] as string;
@@ -147,29 +112,14 @@ describe("getAuthToken", () => {
     _resetLoginUrlPrintedForTesting();
   });
 
-  it("DoesNotPrintLoginUrlWhenNotAuthRequired", () => {
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-    _resetLoginUrlPrintedForTesting();
-
-    withEnv({ HOSTNAME: "127.0.0.1" }, () => {
-      getAuthToken();
-      expect(consoleSpy).not.toHaveBeenCalled();
-    });
-
-    consoleSpy.mockRestore();
-    _resetLoginUrlPrintedForTesting();
-  });
-
   it("PrintsLoginUrlOnlyOnce", () => {
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     _resetLoginUrlPrintedForTesting();
 
-    withEnv({ HOSTNAME: "0.0.0.0" }, () => {
-      getAuthToken();
-      getAuthToken();
-      getAuthToken();
-      expect(consoleSpy).toHaveBeenCalledOnce();
-    });
+    getAuthToken();
+    getAuthToken();
+    getAuthToken();
+    expect(consoleSpy).toHaveBeenCalledOnce();
 
     consoleSpy.mockRestore();
     _resetLoginUrlPrintedForTesting();
@@ -206,51 +156,51 @@ describe("getLoginUrl", () => {
 // ─── validateToken ────────────────────────────────────────────────────────────
 
 describe("validateToken", () => {
-  it("ReturnsTrueForCorrectToken", () => {
+  it("ReturnsTrueForCorrectToken", async () => {
     const token = getAuthToken();
-    expect(validateToken(token)).toBe(true);
+    expect(await validateToken(token)).toBe(true);
   });
 
-  it("ReturnsFalseForIncorrectToken", () => {
-    expect(validateToken("wrongtoken1234567890123456789012")).toBe(false);
+  it("ReturnsFalseForIncorrectToken", async () => {
+    expect(await validateToken("wrongtoken1234567890123456789012")).toBe(false);
   });
 
-  it("ReturnsFalseForEmptyString", () => {
-    expect(validateToken("")).toBe(false);
+  it("ReturnsFalseForEmptyString", async () => {
+    expect(await validateToken("")).toBe(false);
   });
 
-  it("ReturnsFalseForTokenWithExtraChar", () => {
+  it("ReturnsFalseForTokenWithExtraChar", async () => {
     const token = getAuthToken();
-    expect(validateToken(token + "x")).toBe(false);
+    expect(await validateToken(token + "x")).toBe(false);
   });
 
-  it("ReturnsFalseForTruncatedToken", () => {
+  it("ReturnsFalseForTruncatedToken", async () => {
     const token = getAuthToken();
-    expect(validateToken(token.slice(0, -1))).toBe(false);
+    expect(await validateToken(token.slice(0, -1))).toBe(false);
   });
 
-  it("UsesTimingSafeComparison", () => {
-    // Verify timingSafeEqual is used indirectly: incorrect token of same length is rejected
+  it("UsesTimingSafeComparison", async () => {
+    // Verify constant-time comparison is used indirectly: incorrect token of same length is rejected
     const token = getAuthToken();
     const sameLength = "a".repeat(token.length);
-    expect(validateToken(sameLength)).toBe(false);
+    expect(await validateToken(sameLength)).toBe(false);
   });
 
-  it("HandlesNonStringGracefully", () => {
+  it("HandlesNonStringGracefully", async () => {
     // @ts-expect-error — testing runtime robustness with invalid input
-    expect(validateToken(null)).toBe(false);
+    expect(await validateToken(null)).toBe(false);
     // @ts-expect-error — testing runtime robustness with invalid input
-    expect(validateToken(undefined)).toBe(false);
+    expect(await validateToken(undefined)).toBe(false);
     // @ts-expect-error — testing runtime robustness with invalid input
-    expect(validateToken(123)).toBe(false);
+    expect(await validateToken(123)).toBe(false);
   });
 });
 
 // ─── createCookieValue / validateCookie ───────────────────────────────────────
 
 describe("createCookieValue", () => {
-  it("HasExpectedNonceDotHmacFormat", () => {
-    const value = createCookieValue();
+  it("HasExpectedNonceDotHmacFormat", async () => {
+    const value = await createCookieValue();
     const parts = value.split(".");
     expect(parts).toHaveLength(2);
     // Nonce: 32 hex chars (16 bytes)
@@ -259,63 +209,79 @@ describe("createCookieValue", () => {
     expect(parts[1]).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it("GeneratesUniqueCookieOnEachCall", () => {
-    const first = createCookieValue();
-    const second = createCookieValue();
+  it("GeneratesUniqueCookieOnEachCall", async () => {
+    const first = await createCookieValue();
+    const second = await createCookieValue();
     expect(first).not.toBe(second);
   });
 });
 
 describe("validateCookie", () => {
-  it("ReturnsTrueForValidCookieValue", () => {
-    const value = createCookieValue();
-    expect(validateCookie(value)).toBe(true);
+  it("ReturnsTrueForValidCookieValue", async () => {
+    const value = await createCookieValue();
+    expect(await validateCookie(value)).toBe(true);
   });
 
-  it("ReturnsFalseForTamperedHmac", () => {
-    const value = createCookieValue();
+  it("ReturnsFalseForTamperedHmac", async () => {
+    const value = await createCookieValue();
     const [nonce] = value.split(".");
     const tamperedHmac = "0".repeat(64);
-    expect(validateCookie(`${nonce}.${tamperedHmac}`)).toBe(false);
+    expect(await validateCookie(`${nonce}.${tamperedHmac}`)).toBe(false);
   });
 
-  it("ReturnsFalseForTamperedNonce", () => {
-    const value = createCookieValue();
+  it("ReturnsFalseForTamperedNonce", async () => {
+    const value = await createCookieValue();
     const [, hmac] = value.split(".");
     const tamperedNonce = "f".repeat(32);
-    expect(validateCookie(`${tamperedNonce}.${hmac}`)).toBe(false);
+    expect(await validateCookie(`${tamperedNonce}.${hmac}`)).toBe(false);
   });
 
-  it("ReturnsFalseForEmptyString", () => {
-    expect(validateCookie("")).toBe(false);
+  it("ReturnsFalseForEmptyString", async () => {
+    expect(await validateCookie("")).toBe(false);
   });
 
-  it("ReturnsFalseForStringWithNoDot", () => {
-    expect(validateCookie("nodothere")).toBe(false);
+  it("ReturnsFalseForStringWithNoDot", async () => {
+    expect(await validateCookie("nodothere")).toBe(false);
   });
 
-  it("ReturnsFalseForEmptyNonce", () => {
-    expect(validateCookie(".somehmacsuffix")).toBe(false);
+  it("ReturnsFalseForEmptyNonce", async () => {
+    expect(await validateCookie(".somehmacsuffix")).toBe(false);
   });
 
-  it("ReturnsFalseForEmptyHmac", () => {
-    expect(validateCookie("somenonce.")).toBe(false);
+  it("ReturnsFalseForEmptyHmac", async () => {
+    expect(await validateCookie("somenonce.")).toBe(false);
   });
 
-  it("ReturnsFalseForCookieFromDifferentToken", () => {
-    // Simulate a cookie produced with a different token/key using raw crypto
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { createHmac: ch, randomBytes: rb } = require("crypto") as typeof import("crypto");
-    const fakeKey = ch("sha256", "different-token").update("weave-cookie-signing-key").digest();
-    const nonce = rb(16).toString("hex");
-    const fakeHmac = ch("sha256", fakeKey).update(nonce).digest("hex");
-    expect(validateCookie(`${nonce}.${fakeHmac}`)).toBe(false);
+  it("ReturnsFalseForCookieFromDifferentToken", async () => {
+    // Simulate a cookie produced with a different token/key using Web Crypto
+    const enc = new TextEncoder();
+    const fakeTokenKey = await crypto.subtle.importKey(
+      "raw",
+      enc.encode("different-token") as BufferSource,
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"]
+    );
+    const fakeKeyBuf = await crypto.subtle.sign("HMAC", fakeTokenKey, enc.encode("weave-cookie-signing-key") as BufferSource);
+    const fakeKey = await crypto.subtle.importKey(
+      "raw",
+      fakeKeyBuf,
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"]
+    );
+    const nonceBytes = new Uint8Array(16);
+    crypto.getRandomValues(nonceBytes);
+    const nonce = Array.from(nonceBytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+    const fakeHmacBuf = await crypto.subtle.sign("HMAC", fakeKey, enc.encode(nonce) as BufferSource);
+    const fakeHmac = Array.from(new Uint8Array(fakeHmacBuf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+    expect(await validateCookie(`${nonce}.${fakeHmac}`)).toBe(false);
   });
 
-  it("RoundTripsCorrectly", () => {
+  it("RoundTripsCorrectly", async () => {
     for (let i = 0; i < 5; i++) {
-      const value = createCookieValue();
-      expect(validateCookie(value)).toBe(true);
+      const value = await createCookieValue();
+      expect(await validateCookie(value)).toBe(true);
     }
   });
 });

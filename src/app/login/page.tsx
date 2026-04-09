@@ -4,8 +4,7 @@
  * Login page — Aspire-style browser token authentication.
  *
  * Behavior:
- * 1. On mount, calls /api/auth/status to check if auth is required and if already authenticated.
- *    - If auth not required (localhost): redirects to / immediately.
+ * 1. On mount, calls /api/auth/status to check if already authenticated.
  *    - If already authenticated: redirects to returnUrl or /.
  * 2. If URL contains ?token=<value>, auto-submits the token (from console clickable URL).
  *    After auto-submit, strips the token from the URL via history.replaceState to prevent
@@ -14,16 +13,15 @@
  * 4. On success: redirects to returnUrl or /.
  * 5. On failure: shows "Invalid token" error inline.
  *
- * Security: <meta name="referrer" content="no-referrer"> is set in layout.tsx
+ * Security: <meta name="referrer" content="no-referrer"> is set in layout.tsx metadata
  * to prevent the token from leaking via Referer header.
  */
 
 import { useState, useEffect, useRef } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 export default function LoginPage() {
   const searchParams = useSearchParams();
-  const router = useRouter();
 
   const [token, setToken] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -31,11 +29,16 @@ export default function LoginPage() {
   const [isChecking, setIsChecking] = useState(true);
   const hasAutoSubmitted = useRef(false);
 
-  // Validate and sanitize returnUrl to prevent open redirect attacks.
+  // Validate and sanitize returnUrl to prevent open redirect attacks
+  // and redirect loops back to /login.
   // Must be a relative path starting with / (not // or containing ://).
   function getSafeReturnUrl(): string {
     const raw = searchParams.get("returnUrl") ?? "/";
     if (raw.startsWith("/") && !raw.startsWith("//") && !raw.includes("://")) {
+      // Prevent redirect loops — never redirect back to the login page itself
+      if (raw === "/login" || raw.startsWith("/login?") || raw.startsWith("/login/")) {
+        return "/";
+      }
       return raw;
     }
     return "/";
@@ -64,7 +67,12 @@ export default function LoginPage() {
           cleanUrl.searchParams.delete("token");
           window.history.replaceState(null, "", cleanUrl.toString());
         }
-        router.replace(getSafeReturnUrl());
+        // Use hard navigation (not router.replace) so the browser does a full
+        // page load with the newly-set auth cookie. Client-side navigation can
+        // race: React renders the target page and providers fire API calls
+        // before the cookie from the login response is available, causing a
+        // spurious 401 "Failed to load sessions" flash.
+        window.location.href = getSafeReturnUrl();
       } else {
         setError("Invalid token. Please check the URL printed in the server console.");
       }
@@ -83,15 +91,9 @@ export default function LoginPage() {
         if (statusRes.ok) {
           const status = await statusRes.json() as { authRequired: boolean; authenticated?: boolean };
 
-          // Auth not required (localhost) — redirect immediately
-          if (!status.authRequired) {
-            router.replace(getSafeReturnUrl());
-            return;
-          }
-
-          // Already authenticated — redirect immediately
+          // Already authenticated — redirect to destination
           if (status.authenticated) {
-            router.replace(getSafeReturnUrl());
+            window.location.href = getSafeReturnUrl();
             return;
           }
         }
