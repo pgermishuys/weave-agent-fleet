@@ -20,7 +20,7 @@ function getAppVersion(): string {
   return packageJson.version;
 }
 
-// ── Auth token bootstrap ──────────────────────────────────────────────────────
+// ── Auth token bootstrap (dev only) ───────────────────────────────────────────
 // Ensure WEAVE_AUTH_TOKEN is always set in the process environment before any
 // Next.js runtime (Node.js or Edge) loads token-auth.ts.
 //
@@ -30,6 +30,9 @@ function getAppVersion(): string {
 // token → always 401. Setting the env var here (in next.config.ts, which runs
 // once in the main process before workers are created) ensures all runtimes
 // see the same token.
+//
+// This code runs at build time for standalone builds. The runtime fallback lives
+// in instrumentation.ts register(), which runs at server startup.
 //
 // The launcher scripts (launcher.sh / launcher.cmd) already set WEAVE_AUTH_TOKEN
 // for production. This handles the `bun run dev` / `next dev` case.
