@@ -1,5 +1,7 @@
 # Links Sidebar — Persist, Issue Tracking, Polling Hardening
 
+> **PR**: https://github.com/pgermishuys/weave-agent-fleet/pull/188
+
 ## TL;DR
 > **Summary**: Harden the session sidebar's GitHub link tracking with localStorage persistence, issue URL detection/display, and rate-limit-aware polling backoff across three phased vertical slices.
 > **Estimated Effort**: Large
