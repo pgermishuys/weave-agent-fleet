@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readdir, stat } from "fs/promises";
 import { join } from "path";
-import { getInstance } from "@/lib/server/process-manager";
+import { ensureInstanceForSession } from "@/lib/server/opencode-client";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -86,7 +86,7 @@ export async function GET(
   request: NextRequest,
   context: RouteContext
 ): Promise<NextResponse> {
-  const { id: _sessionId } = await context.params;
+  const { id: sessionId } = await context.params;
   const instanceId = request.nextUrl.searchParams.get("instanceId");
 
   if (!instanceId) {
@@ -96,8 +96,10 @@ export async function GET(
     );
   }
 
-  const instance = getInstance(instanceId);
-  if (!instance) {
+  let instance;
+  try {
+    ({ instance } = await ensureInstanceForSession(instanceId, sessionId));
+  } catch {
     return NextResponse.json(
       { error: "Instance not found or unavailable" },
       { status: 404 }

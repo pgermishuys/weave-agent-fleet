@@ -8,7 +8,7 @@ vi.mock("@/lib/server/process-manager", () => ({
 }));
 
 vi.mock("@/lib/server/opencode-client", () => ({
-  getClientForInstance: vi.fn(),
+  ensureInstanceForSession: vi.fn(),
 }));
 
 // ─── Imports (after mocks) ────────────────────────────────────────────────────
@@ -16,7 +16,7 @@ vi.mock("@/lib/server/opencode-client", () => ({
 import { GET } from "@/app/api/sessions/[id]/messages/route";
 import * as openCodeClient from "@/lib/server/opencode-client";
 
-const mockGetClientForInstance = vi.mocked(openCodeClient.getClientForInstance);
+const mockEnsureInstanceForSession = vi.mocked(openCodeClient.ensureInstanceForSession);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -51,6 +51,13 @@ function makeMockClient(messages: ReturnType<typeof makeSDKMessage>[]) {
   };
 }
 
+function makeInstanceResult(client: ReturnType<typeof makeMockClient>) {
+  return {
+    instance: { id: "inst-1", status: "running", directory: "/tmp/proj" },
+    client,
+  };
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe("GET /api/sessions/[id]/messages", () => {
@@ -68,9 +75,7 @@ describe("GET /api/sessions/[id]/messages", () => {
   });
 
   it("returns 404 when instance not found", async () => {
-    mockGetClientForInstance.mockImplementation(() => {
-      throw new Error("Instance not found");
-    });
+    mockEnsureInstanceForSession.mockRejectedValue(new Error("Instance not found"));
 
     const req = makeRequest("instanceId=bad-inst");
     const res = await GET(req, makeContext());
@@ -84,7 +89,7 @@ describe("GET /api/sessions/[id]/messages", () => {
     const messages = Array.from({ length: 60 }, (_, i) =>
       makeSDKMessage(`msg-${i}`),
     );
-    mockGetClientForInstance.mockReturnValue(makeMockClient(messages) as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(makeMockClient(messages)) as never);
 
     const req = makeRequest("instanceId=inst-1");
     const res = await GET(req, makeContext());
@@ -100,7 +105,7 @@ describe("GET /api/sessions/[id]/messages", () => {
     const messages = Array.from({ length: 20 }, (_, i) =>
       makeSDKMessage(`msg-${i}`),
     );
-    mockGetClientForInstance.mockReturnValue(makeMockClient(messages) as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(makeMockClient(messages)) as never);
 
     const req = makeRequest("instanceId=inst-1&limit=10");
     const res = await GET(req, makeContext());
@@ -116,7 +121,7 @@ describe("GET /api/sessions/[id]/messages", () => {
     const messages = Array.from({ length: 20 }, (_, i) =>
       makeSDKMessage(`msg-${i}`),
     );
-    mockGetClientForInstance.mockReturnValue(makeMockClient(messages) as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(makeMockClient(messages)) as never);
 
     const req = makeRequest("instanceId=inst-1&limit=5&before=msg-10");
     const res = await GET(req, makeContext());
@@ -137,7 +142,7 @@ describe("GET /api/sessions/[id]/messages", () => {
     const messages = Array.from({ length: 5 }, (_, i) =>
       makeSDKMessage(`msg-${i}`),
     );
-    mockGetClientForInstance.mockReturnValue(makeMockClient(messages) as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(makeMockClient(messages)) as never);
 
     const req = makeRequest("instanceId=inst-1&limit=10");
     const res = await GET(req, makeContext());
@@ -150,7 +155,7 @@ describe("GET /api/sessions/[id]/messages", () => {
   });
 
   it("handles empty message array", async () => {
-    mockGetClientForInstance.mockReturnValue(makeMockClient([]) as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(makeMockClient([])) as never);
 
     const req = makeRequest("instanceId=inst-1");
     const res = await GET(req, makeContext());
@@ -166,7 +171,7 @@ describe("GET /api/sessions/[id]/messages", () => {
     const messages = Array.from({ length: 10 }, (_, i) =>
       makeSDKMessage(`msg-${i}`),
     );
-    mockGetClientForInstance.mockReturnValue(makeMockClient(messages) as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(makeMockClient(messages)) as never);
 
     const req = makeRequest("instanceId=inst-1&limit=3");
     const res = await GET(req, makeContext());
@@ -181,7 +186,7 @@ describe("GET /api/sessions/[id]/messages", () => {
     const messages = Array.from({ length: 10 }, (_, i) =>
       makeSDKMessage(`msg-${i}`),
     );
-    mockGetClientForInstance.mockReturnValue(makeMockClient(messages) as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(makeMockClient(messages)) as never);
 
     const req = makeRequest("instanceId=inst-1&after=msg-5");
     const res = await GET(req, makeContext());
@@ -204,7 +209,7 @@ describe("GET /api/sessions/[id]/messages", () => {
     const messages = Array.from({ length: 60 }, (_, i) =>
       makeSDKMessage(`msg-${i}`),
     );
-    mockGetClientForInstance.mockReturnValue(makeMockClient(messages) as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(makeMockClient(messages)) as never);
 
     const req = makeRequest("instanceId=inst-1&after=nonexistent-cursor");
     const res = await GET(req, makeContext());
@@ -222,7 +227,7 @@ describe("GET /api/sessions/[id]/messages", () => {
     const messages = Array.from({ length: 5 }, (_, i) =>
       makeSDKMessage(`msg-${i}`),
     );
-    mockGetClientForInstance.mockReturnValue(makeMockClient(messages) as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(makeMockClient(messages)) as never);
 
     const req = makeRequest("instanceId=inst-1&after=msg-4");
     const res = await GET(req, makeContext());
@@ -235,7 +240,7 @@ describe("GET /api/sessions/[id]/messages", () => {
   });
 
   it("returns ALL messages when after is used with empty message array (stale cursor)", async () => {
-    mockGetClientForInstance.mockReturnValue(makeMockClient([]) as never);
+    mockEnsureInstanceForSession.mockResolvedValue(makeInstanceResult(makeMockClient([])) as never);
 
     const req = makeRequest("instanceId=inst-1&after=some-cursor");
     const res = await GET(req, makeContext());
@@ -256,7 +261,10 @@ describe("GET /api/sessions/[id]/messages", () => {
         messages: vi.fn().mockResolvedValue({ data: null }),
       },
     };
-    mockGetClientForInstance.mockReturnValue(client as never);
+    mockEnsureInstanceForSession.mockResolvedValue({
+      instance: { id: "inst-1", status: "running", directory: "/tmp/proj" },
+      client,
+    } as never);
 
     const req = makeRequest("instanceId=inst-1");
     const res = await GET(req, makeContext());

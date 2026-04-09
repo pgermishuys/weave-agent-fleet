@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getClientForInstance } from "@/lib/server/opencode-client";
+import { ensureInstanceForSession, getClientForInstance } from "@/lib/server/opencode-client";
 import { destroyInstance, _recoveryComplete } from "@/lib/server/process-manager";
 import {
   getSession,
@@ -131,10 +131,10 @@ export async function GET(
 
   let client;
   try {
-    client = getClientForInstance(instanceId);
+    ({ client } = await ensureInstanceForSession(instanceId, sessionId));
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[GET /api/sessions/${sessionId}] getClientForInstance failed for instanceId=${instanceId}:`, msg);
+    console.error(`[GET /api/sessions/${sessionId}] ensureInstanceForSession failed for instanceId=${instanceId}:`, msg);
     return NextResponse.json(
       { error: "Instance not found or unavailable" },
       { status: 404 }

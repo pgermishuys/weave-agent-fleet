@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getClientForInstance } from "@/lib/server/opencode-client";
+import { ensureInstanceForSession } from "@/lib/server/opencode-client";
 import { _recoveryComplete } from "@/lib/server/process-manager";
 import { sliceMessages } from "@/lib/pagination-utils";
 import { withTimeout, getSDKCallTimeoutMs } from "@/lib/server/async-utils";
@@ -38,11 +38,11 @@ export async function GET(
 
   let client;
   try {
-    client = getClientForInstance(instanceId);
+    ({ client } = await ensureInstanceForSession(instanceId, sessionId));
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(
-      `[GET /api/sessions/${sessionId}/messages] getClientForInstance failed for instanceId=${instanceId}:`,
+      `[GET /api/sessions/${sessionId}/messages] ensureInstanceForSession failed for instanceId=${instanceId}:`,
       msg,
     );
     return NextResponse.json(

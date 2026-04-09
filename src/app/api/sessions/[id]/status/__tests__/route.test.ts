@@ -4,22 +4,19 @@ import { NextRequest } from "next/server";
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
 vi.mock("@/lib/server/process-manager", () => ({
-  getInstance: vi.fn(),
   _recoveryComplete: Promise.resolve(),
 }));
 
 vi.mock("@/lib/server/opencode-client", () => ({
-  getClientForInstance: vi.fn(),
+  ensureInstanceForSession: vi.fn(),
 }));
 
 // ─── Imports (after mocks) ────────────────────────────────────────────────────
 
 import { GET } from "@/app/api/sessions/[id]/status/route";
-import * as processManager from "@/lib/server/process-manager";
 import * as opencodeClient from "@/lib/server/opencode-client";
 
-const mockGetInstance = vi.mocked(processManager.getInstance);
-const mockGetClientForInstance = vi.mocked(opencodeClient.getClientForInstance);
+const mockEnsureInstanceForSession = vi.mocked(opencodeClient.ensureInstanceForSession);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -35,18 +32,19 @@ function makeContext(sessionId: string) {
   return { params: Promise.resolve({ id: sessionId }) };
 }
 
-function makeInstance(overrides: Record<string, unknown> = {}) {
-  return {
+function makeInstanceAndClient(statusData: Record<string, { type: string }> | null = null) {
+  const mockClient = {
+    session: {
+      status: vi.fn().mockResolvedValue({ data: statusData }),
+    },
+  };
+  const instance = {
     id: "inst-abc",
     directory: "/home/user/project",
     status: "running" as const,
-    client: {
-      session: {
-        status: vi.fn(),
-      },
-    },
-    ...overrides,
+    client: mockClient,
   };
+  return { instance, client: mockClient };
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -68,7 +66,7 @@ describe("GET /api/sessions/[id]/status", () => {
   });
 
   it("Returns404WhenInstanceIsNotFound", async () => {
-    mockGetInstance.mockReturnValue(undefined);
+    mockEnsureInstanceForSession.mockRejectedValue(new Error("Instance not found: inst-missing"));
 
     const req = makeRequest("sess-1", "inst-missing");
     const ctx = makeContext("sess-1");
@@ -80,46 +78,9 @@ describe("GET /api/sessions/[id]/status", () => {
     expect(body.error).toMatch(/not found/i);
   });
 
-  it("Returns404WhenInstanceIsDead", async () => {
-    mockGetInstance.mockReturnValue(makeInstance({ status: "dead" }) as never);
-
-    const req = makeRequest("sess-1", "inst-dead");
-    const ctx = makeContext("sess-1");
-
-    const res = await GET(req, ctx);
-    const body = await res.json();
-
-    expect(res.status).toBe(404);
-    expect(body.error).toMatch(/not found|unavailable/i);
-  });
-
-  it("Returns404WhenGetClientForInstanceThrows", async () => {
-    mockGetInstance.mockReturnValue(makeInstance() as never);
-    mockGetClientForInstance.mockImplementation(() => {
-      throw new Error("Instance is dead");
-    });
-
-    const req = makeRequest("sess-1", "inst-abc");
-    const ctx = makeContext("sess-1");
-
-    const res = await GET(req, ctx);
-    const body = await res.json();
-
-    expect(res.status).toBe(404);
-    expect(body.error).toMatch(/not found|unavailable/i);
-  });
-
   it("ReturnsBusyWhenSdkStatusMapContainsSessionWithTypeBusy", async () => {
-    const instance = makeInstance();
-    mockGetInstance.mockReturnValue(instance as never);
-    const mockClient = {
-      session: {
-        status: vi.fn().mockResolvedValue({
-          data: { "sess-1": { type: "busy" } },
-        }),
-      },
-    };
-    mockGetClientForInstance.mockReturnValue(mockClient as never);
+    const { instance, client } = makeInstanceAndClient({ "sess-1": { type: "busy" } });
+    mockEnsureInstanceForSession.mockResolvedValue({ instance, client } as never);
 
     const req = makeRequest("sess-1", "inst-abc");
     const ctx = makeContext("sess-1");
@@ -129,19 +90,13 @@ describe("GET /api/sessions/[id]/status", () => {
 
     expect(res.status).toBe(200);
     expect(body.status).toBe("busy");
+    // Verify it called session.status with the instance directory
+    expect(client.session.status).toHaveBeenCalledWith({ directory: "/home/user/project" });
   });
 
   it("ReturnsBusyWhenSdkStatusMapContainsSessionWithTypeRetry", async () => {
-    const instance = makeInstance();
-    mockGetInstance.mockReturnValue(instance as never);
-    const mockClient = {
-      session: {
-        status: vi.fn().mockResolvedValue({
-          data: { "sess-1": { type: "retry" } },
-        }),
-      },
-    };
-    mockGetClientForInstance.mockReturnValue(mockClient as never);
+    const { instance, client } = makeInstanceAndClient({ "sess-1": { type: "retry" } });
+    mockEnsureInstanceForSession.mockResolvedValue({ instance, client } as never);
 
     const req = makeRequest("sess-1", "inst-abc");
     const ctx = makeContext("sess-1");
@@ -154,16 +109,8 @@ describe("GET /api/sessions/[id]/status", () => {
   });
 
   it("ReturnsIdleWhenSessionIsAbsentFromSdkStatusMap", async () => {
-    const instance = makeInstance();
-    mockGetInstance.mockReturnValue(instance as never);
-    const mockClient = {
-      session: {
-        status: vi.fn().mockResolvedValue({
-          data: { "other-session": { type: "busy" } },
-        }),
-      },
-    };
-    mockGetClientForInstance.mockReturnValue(mockClient as never);
+    const { instance, client } = makeInstanceAndClient({ "other-session": { type: "busy" } });
+    mockEnsureInstanceForSession.mockResolvedValue({ instance, client } as never);
 
     const req = makeRequest("sess-1", "inst-abc");
     const ctx = makeContext("sess-1");
@@ -176,14 +123,8 @@ describe("GET /api/sessions/[id]/status", () => {
   });
 
   it("ReturnsIdleWhenSdkStatusMapIsEmpty", async () => {
-    const instance = makeInstance();
-    mockGetInstance.mockReturnValue(instance as never);
-    const mockClient = {
-      session: {
-        status: vi.fn().mockResolvedValue({ data: {} }),
-      },
-    };
-    mockGetClientForInstance.mockReturnValue(mockClient as never);
+    const { instance, client } = makeInstanceAndClient({});
+    mockEnsureInstanceForSession.mockResolvedValue({ instance, client } as never);
 
     const req = makeRequest("sess-1", "inst-abc");
     const ctx = makeContext("sess-1");
@@ -196,14 +137,8 @@ describe("GET /api/sessions/[id]/status", () => {
   });
 
   it("ReturnsIdleWhenSdkReturnsNullData", async () => {
-    const instance = makeInstance();
-    mockGetInstance.mockReturnValue(instance as never);
-    const mockClient = {
-      session: {
-        status: vi.fn().mockResolvedValue({ data: null }),
-      },
-    };
-    mockGetClientForInstance.mockReturnValue(mockClient as never);
+    const { instance, client } = makeInstanceAndClient(null);
+    mockEnsureInstanceForSession.mockResolvedValue({ instance, client } as never);
 
     const req = makeRequest("sess-1", "inst-abc");
     const ctx = makeContext("sess-1");
@@ -216,14 +151,13 @@ describe("GET /api/sessions/[id]/status", () => {
   });
 
   it("Returns500WhenSdkCallFails", async () => {
-    const instance = makeInstance();
-    mockGetInstance.mockReturnValue(instance as never);
-    const mockClient = {
+    const { instance } = makeInstanceAndClient();
+    const failingClient = {
       session: {
         status: vi.fn().mockRejectedValue(new Error("SDK timeout")),
       },
     };
-    mockGetClientForInstance.mockReturnValue(mockClient as never);
+    mockEnsureInstanceForSession.mockResolvedValue({ instance, client: failingClient } as never);
 
     const req = makeRequest("sess-1", "inst-abc");
     const ctx = makeContext("sess-1");
