@@ -30,17 +30,6 @@ function keyFor(sessionId: string): string {
   return `${KEY_PREFIX}${sessionId}`;
 }
 
-function isStorageAvailable(): boolean {
-  try {
-    const key = "__weave_storage_test__";
-    localStorage.setItem(key, "1");
-    localStorage.removeItem(key);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 // ─── Public API ────────────────────────────────────────────────────────────
 
 /**
