@@ -82,6 +82,10 @@ export interface PrStatusResponse {
   checksStatus: "pending" | "running" | "success" | "failure" | "none";
   headRef: string;
   url: string;
+  /** GitHub API rate-limit remaining (from most recent upstream response). */
+  rateLimitRemaining?: number;
+  /** Unix epoch seconds when the rate-limit window resets. */
+  rateLimitReset?: number;
 }
 
 /** Lean repo shape for in-memory cache — subset of GitHubRepo */
@@ -93,6 +97,19 @@ export interface CachedGitHubRepo {
   private: boolean;
   language: string | null;
   stargazers_count: number;
+}
+
+/** Issue status for the sidebar polling endpoint. */
+export interface IssueStatusResponse {
+  number: number;
+  title: string;
+  state: "open" | "closed";
+  labels: Array<{ name: string; color: string }>;
+  url: string;
+  /** GitHub API rate-limit remaining (from most recent upstream response). */
+  rateLimitRemaining?: number;
+  /** Unix epoch seconds when the rate-limit window resets. */
+  rateLimitReset?: number;
 }
 
 // ─── Issue Filter ─────────────────────────────────────────────────────────────

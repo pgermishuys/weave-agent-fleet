@@ -52,6 +52,13 @@ export async function GET(
 
   const checksStatus = deriveChecksStatus(suites, totalCount);
 
+  // Use the most recent rate-limit info (prefer checksResult since it runs
+  // second, fall back to prResult).
+  const rateLimitRemaining =
+    checksResult.rateLimitRemaining ?? prResult.rateLimitRemaining;
+  const rateLimitReset =
+    checksResult.rateLimitReset ?? prResult.rateLimitReset;
+
   const response: PrStatusResponse = {
     number: pr.number,
     title: pr.title,
@@ -62,6 +69,8 @@ export async function GET(
     checksStatus,
     headRef: pr.head.ref,
     url: pr.html_url,
+    rateLimitRemaining,
+    rateLimitReset,
   };
 
   return NextResponse.json(response, { status: 200 });

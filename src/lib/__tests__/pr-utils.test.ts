@@ -347,4 +347,22 @@ describe("extractPrReferences", () => {
     expect(result).toHaveLength(1);
     expect(result[0].url).toBe(PR_URL_1);
   });
+
+  it("extracts only PR URLs, not issue URLs, from a message with both", () => {
+    const messages = [
+      makeMessage({
+        parts: [
+          makeToolPart({
+            state: {
+              status: "completed",
+              output: `PR: ${PR_URL_1} Issue: https://github.com/acme/my-repo/issues/42`,
+            },
+          }),
+        ],
+      }),
+    ];
+    const result = extractPrReferences(messages);
+    expect(result).toHaveLength(1);
+    expect(result[0].url).toBe(PR_URL_1);
+  });
 });
