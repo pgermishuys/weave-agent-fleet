@@ -10,6 +10,7 @@ import {
   getSessionByOpencodeId,
   getInstance as getDbInstance,
   updateSessionInstanceId,
+  updateSessionStatus,
 } from "./db-repository";
 import { log } from "./logger";
 import type { OpencodeClient } from "@opencode-ai/sdk/v2";
@@ -51,8 +52,10 @@ export function getClientForInstance(instanceId: string): OpencodeClient {
  *  3. Update the session's instance_id FK so subsequent requests take the fast path.
  *  4. Return { instance, client }.
  *
- * This does NOT change the session's status or stopped_at — that is the
- * responsibility of the session-status-watcher or user-initiated resume.
+ * When the session was in a terminal state (stopped, completed, disconnected,
+ * error), this also transitions it to "idle" so the sidebar immediately reflects
+ * a running session and the session-status-watcher can process subsequent events
+ * (the watcher ignores sessions with terminal DB status).
  *
  * Throws if the session is not found in DB or if spawning fails.
  */
@@ -93,6 +96,26 @@ export async function ensureInstanceForSession(
       log.warn("opencode-client", "Failed to update session instance_id in DB", {
         sessionId: dbSession.id,
         newInstanceId: newInstance.id,
+        err,
+      });
+    }
+  }
+
+  // Transition sessions out of terminal status so the sidebar reflects the
+  // running instance and the session-status-watcher can process subsequent
+  // busy/idle events (the watcher skips sessions with terminal DB status).
+  const TERMINAL_STATUSES = ["stopped", "completed", "disconnected", "error"];
+  if (TERMINAL_STATUSES.includes(dbSession.status)) {
+    try {
+      updateSessionStatus(dbSession.id, "idle");
+      log.info("opencode-client", "Transitioned session from terminal to idle after lazy recovery", {
+        sessionId: dbSession.id,
+        previousStatus: dbSession.status,
+      });
+    } catch (err) {
+      log.warn("opencode-client", "Failed to transition session status after lazy recovery", {
+        sessionId: dbSession.id,
+        previousStatus: dbSession.status,
         err,
       });
     }
