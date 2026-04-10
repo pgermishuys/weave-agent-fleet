@@ -18,6 +18,7 @@ const {
   mockGetSessionByOpencodeId,
   mockGetDbInstance,
   mockUpdateSessionInstanceId,
+  mockUpdateSessionStatus,
 } = vi.hoisted(() => ({
   mockGetInstanceFromPM: vi.fn(),
   mockSpawnInstance: vi.fn(),
@@ -25,6 +26,7 @@ const {
   mockGetSessionByOpencodeId: vi.fn(),
   mockGetDbInstance: vi.fn(),
   mockUpdateSessionInstanceId: vi.fn(),
+  mockUpdateSessionStatus: vi.fn(),
 }));
 
 vi.mock("@/lib/server/process-manager", () => ({
@@ -37,6 +39,7 @@ vi.mock("@/lib/server/db-repository", () => ({
   getSessionByOpencodeId: mockGetSessionByOpencodeId,
   getInstance: mockGetDbInstance,
   updateSessionInstanceId: mockUpdateSessionInstanceId,
+  updateSessionStatus: mockUpdateSessionStatus,
 }));
 
 vi.mock("@/lib/server/logger", () => ({
@@ -217,6 +220,72 @@ describe("ensureInstanceForSession", () => {
     });
 
     // Should NOT throw — DB update failure is non-fatal
+    const result = await ensureInstanceForSession("inst-old", "db-sess-1");
+
+    expect(result.instance).toBe(newInst);
+    expect(result.client).toBe(newInst.client);
+  });
+
+  it.each(["stopped", "completed", "disconnected", "error"] as const)(
+    "SlowPath_TransitionsTerminalStatus_%s_ToIdle",
+    async (terminalStatus) => {
+      mockGetInstanceFromPM.mockReturnValue(undefined);
+
+      const dbSess = makeDbSession({ instance_id: "inst-old", status: terminalStatus });
+      mockGetDbSession.mockReturnValue(dbSess);
+
+      const newInst = makeManagedInstance("inst-new");
+      mockSpawnInstance.mockResolvedValue(newInst);
+
+      await ensureInstanceForSession("inst-old", "db-sess-1");
+
+      expect(mockUpdateSessionStatus).toHaveBeenCalledWith("db-sess-1", "idle");
+    }
+  );
+
+  it("SlowPath_DoesNotTransitionActiveSessionToIdle", async () => {
+    mockGetInstanceFromPM.mockReturnValue(undefined);
+
+    const dbSess = makeDbSession({ instance_id: "inst-old", status: "active" });
+    mockGetDbSession.mockReturnValue(dbSess);
+
+    const newInst = makeManagedInstance("inst-new");
+    mockSpawnInstance.mockResolvedValue(newInst);
+
+    await ensureInstanceForSession("inst-old", "db-sess-1");
+
+    expect(mockUpdateSessionStatus).not.toHaveBeenCalled();
+  });
+
+  it("SlowPath_DoesNotTransitionIdleSessionToIdle", async () => {
+    mockGetInstanceFromPM.mockReturnValue(undefined);
+
+    const dbSess = makeDbSession({ instance_id: "inst-old", status: "idle" });
+    mockGetDbSession.mockReturnValue(dbSess);
+
+    const newInst = makeManagedInstance("inst-new");
+    mockSpawnInstance.mockResolvedValue(newInst);
+
+    await ensureInstanceForSession("inst-old", "db-sess-1");
+
+    expect(mockUpdateSessionStatus).not.toHaveBeenCalled();
+  });
+
+  it("SlowPath_StatusTransitionFailureIsNonFatal", async () => {
+    mockGetInstanceFromPM.mockReturnValue(undefined);
+
+    const dbSess = makeDbSession({ instance_id: "inst-old", status: "stopped" });
+    mockGetDbSession.mockReturnValue(dbSess);
+
+    const newInst = makeManagedInstance("inst-new");
+    mockSpawnInstance.mockResolvedValue(newInst);
+
+    // Status update fails
+    mockUpdateSessionStatus.mockImplementation(() => {
+      throw new Error("DB write error");
+    });
+
+    // Should NOT throw — status transition failure is non-fatal
     const result = await ensureInstanceForSession("inst-old", "db-sess-1");
 
     expect(result.instance).toBe(newInst);
