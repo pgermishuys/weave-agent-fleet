@@ -16,7 +16,7 @@ import { useDiffs } from "@/hooks/use-diffs";
 import { apiFetch } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { FolderOpen, GitBranch, GitCompare, GitFork, Server, Clock, Hash, Square, RotateCcw, Trash2, MessageSquare, OctagonX, AlertTriangle, RefreshCw, ArrowLeft, ChevronRight, ArrowUpToLine, ArrowDownToLine, ListTodo, Eraser, ScrollText, PanelRight, MoreHorizontal, FileCode } from "lucide-react";
+import { FolderOpen, GitBranch, GitCompare, GitFork, Server, Clock, Hash, Square, RotateCcw, Trash2, MessageSquare, OctagonX, ArrowLeft, ChevronRight, ArrowUpToLine, ArrowDownToLine, ListTodo, Eraser, ScrollText, PanelRight, MoreHorizontal, FileCode } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useFoldableScreen } from "@/hooks/use-foldable-screen";
@@ -521,19 +521,6 @@ export default function SessionDetailPage() {
     ? agents.find((a) => a.name === activeAgentName)
     : null;
 
-  // Compute participating agents with message counts for sidebar
-  const participatingAgents = (() => {
-    const counts = new Map<string, number>();
-    for (const m of messages) {
-      if (m.agent) counts.set(m.agent, (counts.get(m.agent) ?? 0) + 1);
-    }
-    return Array.from(counts.entries()).map(([name, count]) => ({
-      name,
-      count,
-      meta: agents.find((a) => a.name === name),
-    }));
-  })();
-
   const handleSend = useCallback(
     async (text: string, agent?: string, model?: SelectedModel, attachments?: ImageAttachment[]) => {
       await sendPrompt(sessionId, instanceId, text, agent, model ?? undefined, attachments);
@@ -994,77 +981,6 @@ export default function SessionDetailPage() {
                 </>
               )}
 
-              {/* Active Agents */}
-              {participatingAgents.length > 0 && (
-                <>
-                  <Separator />
-                  <div className="space-y-2">
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Agents</p>
-                    {participatingAgents.map(({ name, count, meta }) => (
-                      <div key={name} className="flex items-center gap-1.5">
-                        <span
-                          className="h-1.5 w-1.5 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: meta?.color ?? "var(--muted-foreground)" }}
-                        />
-                        <span className="text-xs flex-1">
-                          {name.charAt(0).toUpperCase() + name.slice(1)}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground">
-                          {count} msg{count !== 1 ? "s" : ""}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              <Separator />
-
-              {/* Connection status */}
-              <div className="space-y-1">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Connection</p>
-                <div className="flex items-center gap-1.5">
-                  {status === "error" ? (
-                    <AlertTriangle className="h-3 w-3 text-red-500 shrink-0" />
-                  ) : status === "disconnected" || status === "abandoned" ? (
-                    <AlertTriangle className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0" />
-                  ) : (
-                    <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${
-                      status === "connected" ? "bg-green-500" :
-                      status === "connecting" ? "bg-amber-500 animate-pulse" :
-                      status === "recovering" ? "bg-blue-500 animate-pulse" :
-                      "bg-red-500"
-                    }`} />
-                  )}
-                  <p className={`text-xs ${
-                    status === "error" ? "text-red-500 font-medium" :
-                    status === "disconnected" || status === "abandoned" ? "text-amber-600 dark:text-amber-400" :
-                    ""
-                  }`}>
-                    {status === "error" ? "Error" :
-                     status === "abandoned"
-                       ? "Instance unreachable"
-                       : status === "disconnected"
-                       ? `Disconnected${reconnectAttempt > 0 ? ` (retry ${reconnectAttempt})` : ""}`
-                       : status === "recovering" ? "Recovering…"
-                       : status === "connecting" ? "Connecting…"
-                       : "Connected"}
-                  </p>
-                </div>
-                {(status === "disconnected" || status === "abandoned") && (
-                  <button
-                    onClick={reconnect}
-                    className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 transition-colors"
-                  >
-                    <RefreshCw className="h-2.5 w-2.5" />
-                    Reconnect
-                  </button>
-                )}
-                {status === "error" && error && (
-                  <p className="text-[10px] text-red-600/70 dark:text-red-400/70 break-words mt-0.5">{error}</p>
-                )}
-              </div>
-
               {/* Todos — shown when agent has used todowrite */}
               {latestTodos && latestTodos.length > 0 && (
                 <>
@@ -1163,77 +1079,6 @@ export default function SessionDetailPage() {
                   </div>
                 </>
               )}
-
-              {/* Active Agents */}
-              {participatingAgents.length > 0 && (
-                <>
-                  <Separator />
-                  <div className="space-y-2">
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Agents</p>
-                    {participatingAgents.map(({ name, count, meta }) => (
-                      <div key={name} className="flex items-center gap-1.5">
-                        <span
-                          className="h-1.5 w-1.5 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: meta?.color ?? "var(--muted-foreground)" }}
-                        />
-                        <span className="text-xs flex-1">
-                          {name.charAt(0).toUpperCase() + name.slice(1)}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground">
-                          {count} msg{count !== 1 ? "s" : ""}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              <Separator />
-
-              {/* Connection status */}
-              <div className="space-y-1">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Connection</p>
-                <div className="flex items-center gap-1.5">
-                  {status === "error" ? (
-                    <AlertTriangle className="h-3 w-3 text-red-500 shrink-0" />
-                  ) : status === "disconnected" || status === "abandoned" ? (
-                    <AlertTriangle className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0" />
-                  ) : (
-                    <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${
-                      status === "connected" ? "bg-green-500" :
-                      status === "connecting" ? "bg-amber-500 animate-pulse" :
-                      status === "recovering" ? "bg-blue-500 animate-pulse" :
-                      "bg-red-500"
-                    }`} />
-                  )}
-                  <p className={`text-xs ${
-                    status === "error" ? "text-red-500 font-medium" :
-                    status === "disconnected" || status === "abandoned" ? "text-amber-600 dark:text-amber-400" :
-                    ""
-                  }`}>
-                    {status === "error" ? "Error" :
-                     status === "abandoned"
-                       ? "Instance unreachable"
-                       : status === "disconnected"
-                       ? `Disconnected${reconnectAttempt > 0 ? ` (retry ${reconnectAttempt})` : ""}`
-                       : status === "recovering" ? "Recovering…"
-                       : status === "connecting" ? "Connecting…"
-                       : "Connected"}
-                  </p>
-                </div>
-                {(status === "disconnected" || status === "abandoned") && (
-                  <button
-                    onClick={reconnect}
-                    className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 transition-colors"
-                  >
-                    <RefreshCw className="h-2.5 w-2.5" />
-                    Reconnect
-                  </button>
-                )}
-                {status === "error" && error && (
-                  <p className="text-[10px] text-red-600/70 dark:text-red-400/70 break-words mt-0.5">{error}</p>
-                )}
-              </div>
 
               {/* Todos — shown when agent has used todowrite */}
               {latestTodos && latestTodos.length > 0 && (
