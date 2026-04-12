@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { LayoutGrid, Settings, FolderGit2, PanelLeftClose, PanelLeft } from "lucide-react";
+import { LayoutGrid, Settings, FolderGit2, PanelLeftClose, PanelLeft, MessageSquare } from "lucide-react";
 import { GithubIcon as Github } from "@/components/icons/github";
 import { cn } from "@/lib/utils";
 import {
@@ -17,6 +17,7 @@ import {
   viewHasPanel,
   type SidebarView,
 } from "@/contexts/sidebar-context";
+import { useIntegrationsContext } from "@/contexts/integrations-context";
 
 // ── Default routes per view ──────────────────────────────────────────────────
 
@@ -25,6 +26,7 @@ const VIEW_DEFAULT_ROUTE: Record<SidebarView, string> = {
   fleet: "/",
   github: "/github",
   repositories: "/repositories",
+  "google-chat": "/",
 };
 
 /** Routes that belong to the fleet view */
@@ -193,6 +195,10 @@ function ProfileBadge() {
 
 export function SidebarIconRail() {
   const { activeView, panelOpen, setActiveView, isMobileNav, setMobileDrawerOpen, isCollapsed, toggleCollapse, setCollapsed } = useSidebar();
+  const { connectedIntegrations } = useIntegrationsContext();
+  const isGoogleChatConnected = connectedIntegrations.some(
+    (i) => i.id === "google-chat"
+  );
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -209,6 +215,7 @@ export function SidebarIconRail() {
     fleet: VIEW_DEFAULT_ROUTE.fleet,
     github: VIEW_DEFAULT_ROUTE.github,
     repositories: VIEW_DEFAULT_ROUTE.repositories,
+    "google-chat": VIEW_DEFAULT_ROUTE["google-chat"],
   });
 
   // Keep the map up-to-date as the user navigates within a view
@@ -318,6 +325,9 @@ export function SidebarIconRail() {
         <IconRailButton icon={LayoutGrid} label="Fleet" view="fleet" onSwitch={handleSwitch} />
         <IconRailButton icon={Github} label="GitHub" view="github" onSwitch={handleSwitch} />
         <IconRailButton icon={FolderGit2} label="Repositories" view="repositories" onSwitch={handleSwitch} />
+        {isGoogleChatConnected && (
+          <IconRailButton icon={MessageSquare} label="Google Chat" view="google-chat" onSwitch={handleSwitch} />
+        )}
       </div>
 
       {/* Spacer */}

@@ -15,6 +15,7 @@ export interface IntegrationStatusInfo {
 
 const KNOWN_INTEGRATION_NAMES: Record<string, string> = {
   github: "GitHub",
+  "google-chat": "Google Chat",
 };
 
 // GET /api/integrations — returns all integration statuses

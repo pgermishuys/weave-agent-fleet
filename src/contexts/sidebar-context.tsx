@@ -24,10 +24,10 @@ export const SIDEBAR_DEFAULT_WIDTH = 224;
 // @deprecated use SIDEBAR_RAIL_WIDTH instead
 export const SIDEBAR_COLLAPSED_WIDTH = SIDEBAR_RAIL_WIDTH;
 
-export type SidebarView = "welcome" | "fleet" | "github" | "repositories";
+export type SidebarView = "welcome" | "fleet" | "github" | "repositories" | "google-chat";
 
 /** Views that show a contextual side panel */
-const PANEL_VIEWS = new Set<SidebarView>(["fleet", "github", "repositories"]);
+const PANEL_VIEWS = new Set<SidebarView>(["fleet", "github", "repositories", "google-chat"]);
 
 /** Whether the given view shows a contextual side panel */
 export function viewHasPanel(view: SidebarView): boolean {

@@ -5,9 +5,11 @@ import type { ReactNode } from "react";
 import { useIntegrations } from "@/hooks/use-integrations";
 import type { IntegrationStatusInfo } from "@/hooks/use-integrations";
 
-// Side-effect import — registers the GitHub integration in the registry
+// Side-effect imports — register integrations in the registry
 import "@/integrations/github";
 import { setGitHubConfigured } from "@/integrations/github/manifest";
+import "@/integrations/google-chat";
+import { setGoogleChatConfigured } from "@/integrations/google-chat/manifest";
 
 export interface IntegrationsContextValue {
   integrations: IntegrationStatusInfo[];
@@ -47,6 +49,11 @@ export function IntegrationsProvider({ children }: { children: ReactNode }) {
       (i) => i.id === "github" && i.status === "connected"
     );
     setGitHubConfigured(isGitHubConnected);
+
+    const isGoogleChatConnected = integrations.some(
+      (i) => i.id === "google-chat" && i.status === "connected"
+    );
+    setGoogleChatConfigured(isGoogleChatConnected);
   }, [integrations]);
 
   const value = useMemo(
