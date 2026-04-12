@@ -16,7 +16,7 @@ import { useDiffs } from "@/hooks/use-diffs";
 import { apiFetch } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { FolderOpen, GitBranch, GitCompare, GitFork, Server, Clock, Hash, Square, RotateCcw, Trash2, MessageSquare, OctagonX, ArrowLeft, ChevronRight, ArrowUpToLine, ArrowDownToLine, ListTodo, Eraser, ScrollText, PanelRight, MoreHorizontal, FileCode } from "lucide-react";
+import { GitCompare, GitFork, Server, Hash, Square, RotateCcw, Trash2, MessageSquare, OctagonX, ArrowLeft, ChevronRight, ArrowUpToLine, ArrowDownToLine, ListTodo, Eraser, ScrollText, PanelRight, MoreHorizontal, FileCode } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useFoldableScreen } from "@/hooks/use-foldable-screen";
@@ -599,6 +599,7 @@ export default function SessionDetailPage() {
     <div className="flex flex-col h-full">
       <Header
         title={contextTitle || metadata.title || sessionId.slice(0, 12)}
+        subtitle={metadata.workspaceDirectory ?? undefined}
         actions={
           <div className="flex items-center gap-1 sm:gap-2">
             <span
@@ -915,41 +916,6 @@ export default function SessionDetailPage() {
                 Session Info
               </p>
 
-              {/* Workspace */}
-              {metadata.workspaceDirectory && (
-                <div className="space-y-1">
-                  <div className="flex items-center gap-1.5">
-                    <FolderOpen className="h-3 w-3 text-muted-foreground" />
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Workspace</p>
-                  </div>
-                  <p className="text-xs font-mono break-all">{metadata.workspaceDirectory}</p>
-                </div>
-              )}
-
-              {/* Isolation Strategy */}
-              {metadata.isolationStrategy && (
-                <div className="space-y-1">
-                  <div className="flex items-center gap-1.5">
-                    <GitBranch className="h-3 w-3 text-muted-foreground" />
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Isolation</p>
-                  </div>
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                    {metadata.isolationStrategy}
-                  </Badge>
-                </div>
-              )}
-
-              {/* Created At */}
-              {metadata.createdAt && (
-                <div className="space-y-1">
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="h-3 w-3 text-muted-foreground" />
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Created</p>
-                  </div>
-                  <p className="text-xs">{new Date(metadata.createdAt).toLocaleString()}</p>
-                </div>
-              )}
-
               <Separator />
 
               {/* Tokens & Cost */}
@@ -1014,41 +980,6 @@ export default function SessionDetailPage() {
           </SheetHeader>
           <ScrollArea className="h-[calc(100%-3rem)]">
             <div className="px-4 pb-4 space-y-4">
-              {/* Workspace */}
-              {metadata.workspaceDirectory && (
-                <div className="space-y-1">
-                  <div className="flex items-center gap-1.5">
-                    <FolderOpen className="h-3 w-3 text-muted-foreground" />
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Workspace</p>
-                  </div>
-                  <p className="text-xs font-mono break-all">{metadata.workspaceDirectory}</p>
-                </div>
-              )}
-
-              {/* Isolation Strategy */}
-              {metadata.isolationStrategy && (
-                <div className="space-y-1">
-                  <div className="flex items-center gap-1.5">
-                    <GitBranch className="h-3 w-3 text-muted-foreground" />
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Isolation</p>
-                  </div>
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                    {metadata.isolationStrategy}
-                  </Badge>
-                </div>
-              )}
-
-              {/* Created At */}
-              {metadata.createdAt && (
-                <div className="space-y-1">
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="h-3 w-3 text-muted-foreground" />
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Created</p>
-                  </div>
-                  <p className="text-xs">{new Date(metadata.createdAt).toLocaleString()}</p>
-                </div>
-              )}
-
               <Separator />
 
               {/* Tokens & Cost */}
