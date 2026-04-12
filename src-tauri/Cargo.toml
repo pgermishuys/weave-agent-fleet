@@ -1,6 +1,6 @@
 [package]
 name = "weave-fleet"
-version = "0.18.2"
+version = "0.18.5"
 edition = "2021"
 
 [dependencies]

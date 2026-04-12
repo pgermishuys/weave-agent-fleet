@@ -1,6 +1,6 @@
 {
   "name": "opencode-orchestrator",
-  "version": "0.18.2",
+  "version": "0.18.5",
   "private": true,
   "scripts": {
     "dev": "next dev",
