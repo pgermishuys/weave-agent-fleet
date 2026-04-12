@@ -330,19 +330,19 @@ export function SidebarIconRail() {
             <TooltipTrigger asChild>
               <button
                 type="button"
-                aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                aria-label={panelOpen ? "Collapse sidebar" : "Expand sidebar"}
                 onClick={toggleCollapse}
                 className="flex h-8 w-full items-center justify-center rounded-sm text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground transition-colors"
               >
-                {isCollapsed ? (
-                  <PanelLeft className="h-4 w-4 shrink-0" />
-                ) : (
+                {panelOpen ? (
                   <PanelLeftClose className="h-4 w-4 shrink-0" />
+                ) : (
+                  <PanelLeft className="h-4 w-4 shrink-0" />
                 )}
               </button>
             </TooltipTrigger>
             <TooltipContent side="right">
-              {isCollapsed ? "Expand sidebar (⌘B)" : "Collapse sidebar (⌘B)"}
+              {panelOpen ? "Collapse sidebar (⌘B)" : "Expand sidebar (⌘B)"}
             </TooltipContent>
           </Tooltip>
         </div>
