@@ -147,8 +147,15 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
       setMobileDrawerOpen((open) => !open);
       return;
     }
+    // When expanding from a view that has no panel (e.g. welcome),
+    // restore the last panel view so the panel actually appears.
+    if (isCollapsed && !viewHasPanel(activeView)) {
+      setActiveViewState(lastPanelViewRef.current);
+      setIsCollapsed(false);
+      return;
+    }
     setIsCollapsed((prev) => !prev);
-  }, [isMobileNav, setIsCollapsed, setMobileDrawerOpen]);
+  }, [isMobileNav, isCollapsed, activeView, setActiveViewState, setIsCollapsed, setMobileDrawerOpen]);
 
   const toggleSidebar = useCallback(() => {
     if (isMobileNav) {
