@@ -147,15 +147,16 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
       setMobileDrawerOpen((open) => !open);
       return;
     }
-    // When expanding from a view that has no panel (e.g. welcome),
-    // restore the last panel view so the panel actually appears.
-    if (isCollapsed && !viewHasPanel(activeView)) {
+    // When the current view has no panel (e.g. welcome), the toggle should
+    // always restore the last panel view and ensure it's expanded — regardless
+    // of the current isCollapsed state — so the panel becomes visible.
+    if (!viewHasPanel(activeView)) {
       setActiveViewState(lastPanelViewRef.current);
       setIsCollapsed(false);
       return;
     }
     setIsCollapsed((prev) => !prev);
-  }, [isMobileNav, isCollapsed, activeView, setActiveViewState, setIsCollapsed, setMobileDrawerOpen]);
+  }, [isMobileNav, activeView, setActiveViewState, setIsCollapsed, setMobileDrawerOpen]);
 
   const toggleSidebar = useCallback(() => {
     if (isMobileNav) {
@@ -163,8 +164,8 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
       setMobileDrawerOpen((open) => !open);
       return;
     }
-    if (activeView === "welcome") {
-      // On the welcome page, ⌘B restores last panel view and expands
+    if (!viewHasPanel(activeView)) {
+      // On a non-panel view (e.g. welcome), ⌘B restores last panel view and expands
       setActiveViewState(lastPanelViewRef.current);
       setIsCollapsed(false);
     } else {
