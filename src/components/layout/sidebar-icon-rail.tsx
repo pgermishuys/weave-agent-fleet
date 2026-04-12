@@ -257,13 +257,9 @@ export function SidebarIconRail() {
   const handleSwitch = useCallback(
     (view: SidebarView) => {
       if (isCollapsed && viewHasPanel(view)) {
-        if (activeView === view) {
-          // Re-clicking the active icon while collapsed → expand
-          setCollapsed(false);
-        } else {
-          // Switching to a different panel icon while collapsed → just switch view, stay collapsed
-          setActiveView(view);
-        }
+        // Clicking any panel icon while collapsed → switch view and expand
+        setActiveView(view);
+        setCollapsed(false);
         return;
       }
       setActiveView(nextViewForSwitch(activeView, view));
