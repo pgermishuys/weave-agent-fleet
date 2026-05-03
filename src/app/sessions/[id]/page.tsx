@@ -29,19 +29,13 @@ import { ForkSessionDialog } from "@/components/session/fork-session-dialog";
 import { SpawnSessionDialog } from "@/components/session/spawn-session-dialog";
 import { extractLatestTodos } from "@/lib/todo-utils";
 import { TodoSidebarPanel } from "@/components/session/todo-sidebar-panel";
-import { extractPrReferences } from "@/lib/pr-utils";
-import { extractIssueReferences } from "@/lib/issue-utils";
-import { GitHubLinksSidebarPanel } from "@/components/session/github-links-sidebar-panel";
-import { usePrStatus } from "@/hooks/use-pr-status";
-import { useIssueStatus } from "@/hooks/use-issue-status";
+import { SmartLinksSidebarPanel } from "@/components/session/smart-links-sidebar-panel";
+import { extractSmartLinksFromMessages } from "@/lib/smart-links/registry";
+import { useSmartLinkStatuses } from "@/hooks/use-smart-link-statuses";
+import { useSmartLinkStorage } from "@/lib/smart-links/storage";
+// Ensure built-in providers are registered
+import "@/lib/smart-links/registry";
 import { sessionCache } from "@/lib/session-cache";
-import {
-  loadSessionLinks,
-  saveSessionLinks,
-  cleanupStaleLinks,
-  mergePrReferences,
-  mergeIssueReferences,
-} from "@/lib/link-storage";
 import { DiffViewer } from "@/components/session/diff-viewer";
 import { FilesTabContent } from "@/components/session/files-tab-content";
 import { DiffModeToggle } from "@/components/session/diff-mode-toggle";
@@ -438,49 +432,16 @@ export default function SessionDetailPage() {
   );
   const latestTodos = useMemo(() => extractLatestTodos(messages), [messages]);
 
-  // PR detection: merge localStorage-persisted → in-memory cache → message-extracted
-  // so that PRs survive page refreshes and message pagination/trimming.
-  const messagesPrs = useMemo(() => extractPrReferences(messages), [messages]);
-  const detectedPrs = useMemo(() => {
-    const persisted = loadSessionLinks(sessionId);
-    const cachedPrs = sessionCache.getPrReferences(sessionId, instanceId);
-    return mergePrReferences(
-      persisted?.prs,
-      cachedPrs,
-      messagesPrs
-    );
-  }, [messagesPrs, sessionId, instanceId]);
-
-  // Issue detection: same merge strategy as PRs.
-  const messagesIssues = useMemo(() => extractIssueReferences(messages), [messages]);
-  const detectedIssues = useMemo(() => {
-    const persisted = loadSessionLinks(sessionId);
-    return mergeIssueReferences(
-      persisted?.issues,
-      messagesIssues
-    );
-  }, [messagesIssues, sessionId]);
-
-  // Persist detected links (PRs + issues) to both session cache and localStorage
-  useEffect(() => {
-    if (detectedPrs.length > 0 || detectedIssues.length > 0) {
-      sessionCache.patchPrReferences(sessionId, instanceId, detectedPrs);
-      saveSessionLinks(sessionId, {
-        version: 1,
-        updatedAt: Date.now(),
-        prs: detectedPrs,
-        issues: detectedIssues,
-      });
-    }
-  }, [detectedPrs, detectedIssues, sessionId, instanceId]);
-
-  // Clean up stale localStorage entries on mount (7-day expiry)
-  useEffect(() => {
-    cleanupStaleLinks();
-  }, []);
-
-  const { statuses: prStatuses } = usePrStatus(detectedPrs);
-  const { statuses: issueStatuses } = useIssueStatus(detectedIssues);
+  // Smart links: detect from current messages, merge + persist via server, poll status
+  const detectedRefs = useMemo(
+    () => extractSmartLinksFromMessages(messages),
+    [messages]
+  );
+  const { links: smartLinks, dismiss: dismissSmartLink } = useSmartLinkStorage(
+    sessionId,
+    detectedRefs
+  );
+  const { statuses: smartLinkStatuses } = useSmartLinkStatuses(smartLinks);
 
   // Register toggle-todo-panel command (depends on latestTodos)
   useEffect(() => {
@@ -955,15 +916,14 @@ export default function SessionDetailPage() {
                 </>
               )}
 
-              {/* GitHub Links — shown when PRs or issues are detected in this session */}
-              {(detectedPrs.length > 0 || detectedIssues.length > 0) && (
+              {/* Smart Links — shown when links are detected in this session */}
+              {smartLinks.length > 0 && (
                 <>
                   <Separator />
-                  <GitHubLinksSidebarPanel
-                    prs={detectedPrs}
-                    prStatuses={prStatuses}
-                    issues={detectedIssues}
-                    issueStatuses={issueStatuses}
+                  <SmartLinksSidebarPanel
+                    refs={smartLinks}
+                    statuses={smartLinkStatuses}
+                    onDismiss={dismissSmartLink}
                   />
                 </>
               )}
@@ -1019,15 +979,14 @@ export default function SessionDetailPage() {
                 </>
               )}
 
-              {/* GitHub Links — shown when PRs or issues are detected in this session */}
-              {(detectedPrs.length > 0 || detectedIssues.length > 0) && (
+              {/* Smart Links — shown when links are detected in this session */}
+              {smartLinks.length > 0 && (
                 <>
                   <Separator />
-                  <GitHubLinksSidebarPanel
-                    prs={detectedPrs}
-                    prStatuses={prStatuses}
-                    issues={detectedIssues}
-                    issueStatuses={issueStatuses}
+                  <SmartLinksSidebarPanel
+                    refs={smartLinks}
+                    statuses={smartLinkStatuses}
+                    onDismiss={dismissSmartLink}
                   />
                 </>
               )}

@@ -54,6 +54,10 @@ export interface DbSession {
   total_tokens: number;
   /** Accumulated total cost in USD across all messages */
   total_cost: number;
+  /** JSON-serialised SmartLinkReference[] — detected smart links for this session */
+  smart_links: string | null;
+  /** JSON-serialised string[] — URLs that the user has dismissed */
+  dismissed_smart_links: string | null;
 }
 
 // ─── Insert input types (id + timestamps are required on insert) ──────────────
@@ -588,6 +592,93 @@ export function getFleetTokenTotals(): { totalTokens: number; totalCost: number 
     .prepare("SELECT COALESCE(SUM(total_tokens), 0) as total_tokens, COALESCE(SUM(total_cost), 0) as total_cost FROM sessions")
     .get() as { total_tokens: number; total_cost: number };
   return { totalTokens: row.total_tokens, totalCost: row.total_cost };
+}
+
+// ─── Smart Links ──────────────────────────────────────────────────────────────
+
+export interface SessionSmartLinksRow {
+  smart_links: string | null;
+  dismissed_smart_links: string | null;
+}
+
+/**
+ * Return the raw JSON strings for smart_links and dismissed_smart_links.
+ * Returns `undefined` when the session doesn't exist.
+ */
+export function getSessionSmartLinks(
+  id: string
+): SessionSmartLinksRow | undefined {
+  return getDb()
+    .prepare(
+      "SELECT smart_links, dismissed_smart_links FROM sessions WHERE id = ?"
+    )
+    .get(id) as SessionSmartLinksRow | undefined;
+}
+
+/**
+ * Overwrite the smart_links column for a session.
+ * Pass `null` to clear all links.
+ */
+export function updateSessionSmartLinks(
+  id: string,
+  smartLinks: string | null
+): void {
+  getDb()
+    .prepare("UPDATE sessions SET smart_links = @smart_links WHERE id = @id")
+    .run({ id, smart_links: smartLinks });
+}
+
+/**
+ * Add a URL to the dismissed_smart_links list for a session.
+ * Deduplicates — adding an already-dismissed URL is a no-op.
+ */
+export function dismissSessionSmartLink(id: string, url: string): void {
+  const db = getDb();
+  const row = db
+    .prepare("SELECT dismissed_smart_links FROM sessions WHERE id = ?")
+    .get(id) as { dismissed_smart_links: string | null } | undefined;
+
+  if (!row) return;
+
+  let dismissed: string[] = [];
+  if (row.dismissed_smart_links) {
+    try {
+      dismissed = JSON.parse(row.dismissed_smart_links) as string[];
+    } catch {
+      dismissed = [];
+    }
+  }
+
+  if (!dismissed.includes(url)) {
+    dismissed.push(url);
+    db.prepare(
+      "UPDATE sessions SET dismissed_smart_links = @dismissed WHERE id = @id"
+    ).run({ id, dismissed: JSON.stringify(dismissed) });
+  }
+}
+
+/**
+ * Remove a URL from the dismissed_smart_links list (un-dismiss).
+ */
+export function undismissSessionSmartLink(id: string, url: string): void {
+  const db = getDb();
+  const row = db
+    .prepare("SELECT dismissed_smart_links FROM sessions WHERE id = ?")
+    .get(id) as { dismissed_smart_links: string | null } | undefined;
+
+  if (!row?.dismissed_smart_links) return;
+
+  let dismissed: string[] = [];
+  try {
+    dismissed = JSON.parse(row.dismissed_smart_links) as string[];
+  } catch {
+    return;
+  }
+
+  const updated = dismissed.filter((u) => u !== url);
+  db.prepare(
+    "UPDATE sessions SET dismissed_smart_links = @dismissed WHERE id = @id"
+  ).run({ id, dismissed: JSON.stringify(updated) });
 }
 
 // ─── Workspace Roots ──────────────────────────────────────────────────────────

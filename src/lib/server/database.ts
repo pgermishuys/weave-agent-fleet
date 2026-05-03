@@ -127,6 +127,18 @@ export function getDb(): Database.Database {
     // Column already exists — ignore
   }
 
+  // Smart links: detected links and user-dismissed link URLs per session
+  try {
+    db.exec(`ALTER TABLE sessions ADD COLUMN smart_links TEXT`);
+  } catch {
+    // Column already exists — ignore
+  }
+  try {
+    db.exec(`ALTER TABLE sessions ADD COLUMN dismissed_smart_links TEXT`);
+  } catch {
+    // Column already exists — ignore
+  }
+
   // Add index on sessions.status for efficient status-based queries
   db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status)`);
 
