@@ -33,8 +33,8 @@ import { SmartLinksSidebarPanel } from "@/components/session/smart-links-sidebar
 import { extractSmartLinksFromMessages } from "@/lib/smart-links/registry";
 import { useSmartLinkStatuses } from "@/hooks/use-smart-link-statuses";
 import { useSmartLinkStorage } from "@/lib/smart-links/storage";
-// Ensure built-in providers are registered
-import "@/lib/smart-links/registry";
+// Ensure built-in providers are registered (must be separate from registry to avoid circular deps)
+import "@/lib/smart-links/providers";
 import { sessionCache } from "@/lib/session-cache";
 import { DiffViewer } from "@/components/session/diff-viewer";
 import { FilesTabContent } from "@/components/session/files-tab-content";

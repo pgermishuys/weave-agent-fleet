@@ -117,8 +117,7 @@ export function mergeSmartLinkReferences(
 }
 
 // ─── Auto-register built-in providers ────────────────────────────────────────
-// Import side-effects: each provider module calls registerProvider() on import.
-// New providers: add an import here + implement SmartLinkProvider.
-
-import "@/lib/smart-links/providers/github";
-import "@/lib/smart-links/providers/linear";
+// NOTE: Providers are registered via a separate entry-point module
+// (`@/lib/smart-links/providers/index`) to avoid circular dependency issues.
+// Any file importing from this registry should also import the providers entry-point
+// to ensure providers are registered before detection runs.
