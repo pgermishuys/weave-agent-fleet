@@ -470,7 +470,20 @@ fn check_opencode_available() -> bool {
         .is_ok()
 }
 
+/// Open the fleet UI in the user's default browser.
+fn open_browser(port: u16) {
+    let url = format!("http://127.0.0.1:{}", port);
+    if let Err(e) = open::that(&url) {
+        eprintln!("[weave-fleet] Failed to open browser: {}", e);
+    }
+}
+
 pub fn run() {
+    let tray_only = std::env::args().any(|a| a == "--tray");
+    if tray_only {
+        println!("[weave-fleet] Starting in tray-only mode (--tray)");
+    }
+
     tauri::Builder::default()
         // --- Tauri commands ---
         .invoke_handler(tauri::generate_handler![
@@ -484,8 +497,12 @@ pub fn run() {
         ])
         // --- Plugins (must be registered before setup) ---
         .plugin(
-            tauri_plugin_single_instance::init(|app, _args, _cwd| {
-                if let Some(window) = app.get_webview_window("main") {
+            tauri_plugin_single_instance::init(move |app, _args, _cwd| {
+                if tray_only {
+                    if let Some(state) = app.try_state::<SidecarState>() {
+                        open_browser(state.port);
+                    }
+                } else if let Some(window) = app.get_webview_window("main") {
                     let _ = window.unminimize();
                     let _ = window.show();
                     let _ = window.set_focus();
@@ -496,7 +513,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         // --- Setup ---
-        .setup(|app| {
+        .setup(move |app| {
             // (a) Check for opencode CLI
             if !check_opencode_available() {
                 eprintln!(
@@ -506,18 +523,20 @@ pub fn run() {
             }
 
             // Manage pending update state (for frontend pull-based check)
-            app.manage(PendingUpdateState {
-                payload: Mutex::new(None),
-                staged_payload: Mutex::new(None),
-                download_in_progress: Mutex::new(false),
-                download_generation: Mutex::new(0),
-            });
-            app.manage(UpdatePreferencesState {
-                prefs: Mutex::new(UpdatePreferences {
-                    auto_update: false,
-                    channel: "stable".to_string(),
-                }),
-            });
+            if !tray_only {
+                app.manage(PendingUpdateState {
+                    payload: Mutex::new(None),
+                    staged_payload: Mutex::new(None),
+                    download_in_progress: Mutex::new(false),
+                    download_generation: Mutex::new(0),
+                });
+                app.manage(UpdatePreferencesState {
+                    prefs: Mutex::new(UpdatePreferences {
+                        auto_update: false,
+                        channel: "stable".to_string(),
+                    }),
+                });
+            }
 
             // (b) Find free port
             let port = find_free_port();
@@ -586,135 +605,211 @@ pub fn run() {
                 });
             }
 
-            // (d) Health check + webview navigation (production only)
-            let window = app
-                .get_webview_window("main")
-                .expect("Failed to get main window");
+            // (d) Health check + navigation
+            if tray_only {
+                // Tray mode: health check + open default browser
+                #[cfg(not(debug_assertions))]
+                {
+                    tauri::async_runtime::spawn(async move {
+                        let health_url = format!("http://127.0.0.1:{}/api/version", port);
+                        let client = reqwest::Client::new();
+                        let start = std::time::Instant::now();
 
-            #[cfg(not(debug_assertions))]
-            {
-                let window_clone = window.clone();
-                tauri::async_runtime::spawn(async move {
-                    let health_url = format!("http://127.0.0.1:{}/api/version", port);
-                    let client = reqwest::Client::new();
-                    let start = std::time::Instant::now();
-
-                    loop {
-                        if start.elapsed() > std::time::Duration::from_secs(30) {
-                            eprintln!(
-                                "[weave-fleet] Sidecar failed to start within 30 seconds"
-                            );
-                            // Show error in the placeholder page
-                            let _ = window_clone.eval(
-                                "document.body.innerHTML = '<h2>Failed to start server</h2><p>The application server did not respond within 30 seconds.</p>';"
-                            );
-                            let _ = window_clone.show();
-                            return;
-                        }
-                        match client.get(&health_url).send().await {
-                            Ok(resp) if resp.status().is_success() => break,
-                            _ => {
-                                tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+                        loop {
+                            if start.elapsed() > std::time::Duration::from_secs(30) {
+                                eprintln!(
+                                    "[weave-fleet] Sidecar failed to start within 30 seconds"
+                                );
+                                return;
+                            }
+                            match client.get(&health_url).send().await {
+                                Ok(resp) if resp.status().is_success() => break,
+                                _ => {
+                                    tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+                                }
                             }
                         }
-                    }
 
-                    // Navigate webview to the sidecar
-                    let url = format!("http://127.0.0.1:{}", port);
-                    println!("[weave-fleet] Sidecar ready, navigating to {}", url);
-                    let _ = window_clone.navigate(url.parse().unwrap());
-                    let _ = window_clone.show();
-                });
-            }
+                        println!("[weave-fleet] Sidecar ready on port {}", port);
+                        open_browser(port);
+                    });
+                }
+            } else {
+                // Default mode: health check + webview navigation
+                let window = app
+                    .get_webview_window("main")
+                    .expect("Failed to get main window");
 
-            // In dev mode, window is shown immediately (devUrl handles it)
-            #[cfg(debug_assertions)]
-            {
-                let _ = window.show();
+                #[cfg(not(debug_assertions))]
+                {
+                    let window_clone = window.clone();
+                    tauri::async_runtime::spawn(async move {
+                        let health_url = format!("http://127.0.0.1:{}/api/version", port);
+                        let client = reqwest::Client::new();
+                        let start = std::time::Instant::now();
+
+                        loop {
+                            if start.elapsed() > std::time::Duration::from_secs(30) {
+                                eprintln!(
+                                    "[weave-fleet] Sidecar failed to start within 30 seconds"
+                                );
+                                // Show error in the placeholder page
+                                let _ = window_clone.eval(
+                                    "document.body.innerHTML = '<h2>Failed to start server</h2><p>The application server did not respond within 30 seconds.</p>';"
+                                );
+                                let _ = window_clone.show();
+                                return;
+                            }
+                            match client.get(&health_url).send().await {
+                                Ok(resp) if resp.status().is_success() => break,
+                                _ => {
+                                    tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+                                }
+                            }
+                        }
+
+                        // Navigate webview to the sidecar
+                        let url = format!("http://127.0.0.1:{}", port);
+                        println!("[weave-fleet] Sidecar ready, navigating to {}", url);
+                        let _ = window_clone.navigate(url.parse().unwrap());
+                        let _ = window_clone.show();
+                    });
+                }
+
+                // In dev mode, window is shown immediately (devUrl handles it)
+                #[cfg(debug_assertions)]
+                {
+                    let _ = window.show();
+                }
             }
 
             // (e) System tray
-            let show_hide =
-                MenuItem::with_id(app, "show_hide", "Show Window", true, None::<&str>)?;
-            let agent_count =
-                MenuItem::with_id(app, "agent_count", "Agents: 0 active", false, None::<&str>)?;
-            let quit =
-                MenuItem::with_id(app, "quit", "Quit Weave Fleet", true, None::<&str>)?;
-            let sep1 = PredefinedMenuItem::separator(app)?;
-            let sep2 = PredefinedMenuItem::separator(app)?;
+            if tray_only {
+                // Tray-only mode: simplified menu with browser-open
+                let open_item =
+                    MenuItem::with_id(app, "open", "Open Weave Fleet", true, None::<&str>)?;
+                let quit =
+                    MenuItem::with_id(app, "quit", "Exit", true, None::<&str>)?;
+                let sep = PredefinedMenuItem::separator(app)?;
 
-            let menu =
-                Menu::with_items(app, &[&show_hide, &sep1, &agent_count, &sep2, &quit])?;
+                let menu = Menu::with_items(app, &[&open_item, &sep, &quit])?;
 
-            TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
-                .tooltip("Weave Fleet")
-                .menu(&menu)
-                .show_menu_on_left_click(false)
-                .on_menu_event(|app, event| match event.id.as_ref() {
-                    "show_hide" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            if window.is_visible().unwrap_or(false) {
-                                let _ = window.hide();
-                            } else {
+                TrayIconBuilder::new()
+                    .icon(app.default_window_icon().unwrap().clone())
+                    .tooltip("Weave Fleet")
+                    .menu(&menu)
+                    .show_menu_on_left_click(false)
+                    .on_menu_event(|app, event| match event.id.as_ref() {
+                        "open" => {
+                            if let Some(state) = app.try_state::<SidecarState>() {
+                                open_browser(state.port);
+                            }
+                        }
+                        "quit" => {
+                            app.exit(0);
+                        }
+                        _ => {}
+                    })
+                    .on_tray_icon_event(|tray, event| {
+                        if let tauri::tray::TrayIconEvent::Click {
+                            button: tauri::tray::MouseButton::Left,
+                            ..
+                        } = event
+                        {
+                            let app = tray.app_handle();
+                            if let Some(state) = app.try_state::<SidecarState>() {
+                                open_browser(state.port);
+                            }
+                        }
+                    })
+                    .build(app)?;
+            } else {
+                // Default mode: full tray with window management
+                let show_hide =
+                    MenuItem::with_id(app, "show_hide", "Show Window", true, None::<&str>)?;
+                let agent_count =
+                    MenuItem::with_id(app, "agent_count", "Agents: 0 active", false, None::<&str>)?;
+                let quit =
+                    MenuItem::with_id(app, "quit", "Quit Weave Fleet", true, None::<&str>)?;
+                let sep1 = PredefinedMenuItem::separator(app)?;
+                let sep2 = PredefinedMenuItem::separator(app)?;
+
+                let menu =
+                    Menu::with_items(app, &[&show_hide, &sep1, &agent_count, &sep2, &quit])?;
+
+                TrayIconBuilder::new()
+                    .icon(app.default_window_icon().unwrap().clone())
+                    .tooltip("Weave Fleet")
+                    .menu(&menu)
+                    .show_menu_on_left_click(false)
+                    .on_menu_event(|app, event| match event.id.as_ref() {
+                        "show_hide" => {
+                            if let Some(window) = app.get_webview_window("main") {
+                                if window.is_visible().unwrap_or(false) {
+                                    let _ = window.hide();
+                                } else {
+                                    let _ = window.show();
+                                    let _ = window.set_focus();
+                                }
+                            }
+                        }
+                        "quit" => {
+                            app.exit(0);
+                        }
+                        _ => {}
+                    })
+                    .on_tray_icon_event(|tray, event| {
+                        if let tauri::tray::TrayIconEvent::Click {
+                            button: tauri::tray::MouseButton::Left,
+                            ..
+                        } = event
+                        {
+                            let app = tray.app_handle();
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.unminimize();
                                 let _ = window.show();
                                 let _ = window.set_focus();
                             }
                         }
-                    }
-                    "quit" => {
-                        app.exit(0);
-                    }
-                    _ => {}
-                })
-                .on_tray_icon_event(|tray, event| {
-                    if let tauri::tray::TrayIconEvent::Click {
-                        button: tauri::tray::MouseButton::Left,
-                        ..
-                    } = event
-                    {
-                        let app = tray.app_handle();
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.unminimize();
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
-                    }
-                })
-                .build(app)?;
+                    })
+                    .build(app)?;
 
-            // Store tray state for polling updates
-            app.manage(TrayState {
-                agent_count_item: agent_count,
-            });
+                // Store tray state for polling updates
+                app.manage(TrayState {
+                    agent_count_item: agent_count,
+                });
+            }
 
-            // (f) Agent count polling (every 10 seconds)
-            let handle = app.handle().clone();
-            let fleet_url = format!("http://127.0.0.1:{}/api/fleet/summary", port);
-            tauri::async_runtime::spawn(async move {
-                let client = reqwest::Client::new();
-                // Wait for sidecar to be ready before starting to poll
-                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-                loop {
-                    if let Ok(resp) = client.get(&fleet_url).send().await {
-                        if let Ok(body) = resp.json::<serde_json::Value>().await {
-                            if let Some(count) =
-                                body.get("activeSessions").and_then(|v| v.as_u64())
-                            {
-                                let text = format!("Agents: {} active", count);
-                                if let Some(state) = handle.try_state::<TrayState>() {
-                                    let _ = state.agent_count_item.set_text(&text);
+            // (f) Agent count polling (every 10 seconds) — default mode only
+            if !tray_only {
+                let handle = app.handle().clone();
+                let fleet_url = format!("http://127.0.0.1:{}/api/fleet/summary", port);
+                tauri::async_runtime::spawn(async move {
+                    let client = reqwest::Client::new();
+                    // Wait for sidecar to be ready before starting to poll
+                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                    loop {
+                        if let Ok(resp) = client.get(&fleet_url).send().await {
+                            if let Ok(body) = resp.json::<serde_json::Value>().await {
+                                if let Some(count) =
+                                    body.get("activeSessions").and_then(|v| v.as_u64())
+                                {
+                                    let text = format!("Agents: {} active", count);
+                                    if let Some(state) = handle.try_state::<TrayState>() {
+                                        let _ = state.agent_count_item.set_text(&text);
+                                    }
                                 }
                             }
                         }
+                        tokio::time::sleep(std::time::Duration::from_secs(10)).await;
                     }
-                    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-                }
-            });
+                });
+            }
 
-            // (g) Apply staged update on startup, then check for updates.
-            let update_handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
+            // (g) Apply staged update on startup, then check for updates — default mode only.
+            if !tray_only {
+                let update_handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
                 if let Some(pending_state) = update_handle.try_state::<PendingUpdateState>() {
                     match apply_staged_update_internal(&update_handle, &pending_state).await {
                         Ok(true) => {
@@ -761,15 +856,20 @@ pub fn run() {
                 } else {
                     eprintln!("[weave-fleet] Pending update state unavailable");
                 }
-            });
+                });
+            }
 
             Ok(())
         })
-        // --- Minimize to tray on close ---
-        .on_window_event(|window, event| {
+        // --- Minimize to tray on close (default mode only) ---
+        .on_window_event(move |window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                api.prevent_close();
-                let _ = window.hide();
+                if !tray_only {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+                // In tray mode: let the default close behavior happen
+                // (the window is never shown, so this is a no-op)
             }
         })
         .build(tauri::generate_context!())
