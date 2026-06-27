@@ -6,6 +6,35 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
+/**
+ * Deduplicate agents by name, preferring entries that carry richer metadata
+ * (description or color). OpenCode merges configs from multiple sources and
+ * array-merges the `plugin` key, so when both the Weave plugin (which
+ * registers built-in agents like "Loom (Main Orchestrator)" with description
+ * and color) and an `OPENCODE_CONFIG_CONTENT.agent.<name>` override (which
+ * only carries `model`) are present, two agents with the same `name` but
+ * differing metadata appear. The bare one is a side-effect of the deadlock
+ * workaround in process-manager.ts:buildAgentModelConfig and is missing the
+ * prompt_append/skills/description the plugin's entry has, so drop it.
+ */
+function dedupeAgents(agents: AutocompleteAgent[]): AutocompleteAgent[] {
+  const byName = new Map<string, AutocompleteAgent>();
+  for (const agent of agents) {
+    const existing = byName.get(agent.name);
+    if (!existing) {
+      byName.set(agent.name, agent);
+      continue;
+    }
+    // Prefer the entry that has a description; tie-break on color, then mode.
+    const score = (a: AutocompleteAgent): number =>
+      (a.description ? 2 : 0) + (a.color ? 1 : 0);
+    if (score(agent) > score(existing)) {
+      byName.set(agent.name, agent);
+    }
+  }
+  return [...byName.values()];
+}
+
 // GET /api/instances/[id]/agents — list available agents for an instance
 export async function GET(
   _request: NextRequest,
@@ -38,7 +67,7 @@ export async function GET(
       model: agent.model,
       hidden: agent.hidden,
     }));
-    return NextResponse.json(response, { status: 200 });
+    return NextResponse.json(dedupeAgents(response), { status: 200 });
   } catch (err) {
     console.error(`[GET /api/instances/${instanceId}/agents] Error:`, err);
     return NextResponse.json(
