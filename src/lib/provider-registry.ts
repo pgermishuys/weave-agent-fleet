@@ -96,6 +96,25 @@ export const BUNDLED_PROVIDERS: BundledProvider[] = [
       { id: "o4-mini", name: "o4 Mini (Copilot)" },
     ],
   },
+  {
+    id: "opencode-go",
+    name: "OpenCode Go",
+    models: [
+      { id: "opencode-go/deepseek-v4-flash", name: "DeepSeek V4 Flash" },
+      { id: "opencode-go/deepseek-v4-pro", name: "DeepSeek V4 Pro" },
+      { id: "opencode-go/glm-5.1", name: "GLM 5.1" },
+      { id: "opencode-go/glm-5.2", name: "GLM 5.2" },
+      { id: "opencode-go/kimi-k2.6", name: "Kimi K2.6" },
+      { id: "opencode-go/kimi-k2.7-code", name: "Kimi K2.7 Code" },
+      { id: "opencode-go/mimo-v2.5", name: "MiMo V2.5" },
+      { id: "opencode-go/mimo-v2.5-pro", name: "MiMo V2.5 Pro" },
+      { id: "opencode-go/minimax-m2.7", name: "MiniMax M2.7" },
+      { id: "opencode-go/minimax-m3", name: "MiniMax M3" },
+      { id: "opencode-go/qwen3.6-plus", name: "Qwen 3.6 Plus" },
+      { id: "opencode-go/qwen3.7-max", name: "Qwen 3.7 Max" },
+      { id: "opencode-go/qwen3.7-plus", name: "Qwen 3.7 Plus" },
+    ],
+  },
 ];
 
 /** Lookup helper: get a BundledProvider by its id */
