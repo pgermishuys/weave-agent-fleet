@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import type {
   AccumulatedMessage,
+  PendingQuestion,
   SSEEvent,
 } from "@/lib/api-types";
 import { apiFetch, sseUrl, isSessionUnauthenticated } from "@/lib/api-client";
@@ -62,6 +63,8 @@ export interface UseSessionEventsResult {
    * scroll event so the current scroll position is available on unmount.
    */
   scrollPositionRef: React.MutableRefObject<{ scrollTop: number; scrollHeight: number } | null>;
+  /** Pending questions from question.asked events (filtered by reply/reject). */
+  pendingQuestions: PendingQuestion[];
 }
 
 const MAX_RECONNECT_DELAY_MS = 30_000;
@@ -89,6 +92,7 @@ export function useSessionEvents(
   // Cache hit state — set on first connect if a valid cache entry exists.
   const [cacheHit, setCacheHit] = useState(false);
   const [initialScrollPosition, setInitialScrollPosition] = useState<{ scrollTop: number; scrollHeight: number } | null>(null);
+  const [pendingQuestions, setPendingQuestions] = useState<PendingQuestion[]>([]);
 
   const pagination = useMessagePagination();
   // Destructure stable function references to avoid unstable object identity in deps
@@ -308,7 +312,7 @@ export function useSessionEvents(
       } catch {
         return;
       }
-      handleEvent(event, sessionId, setMessages, setStatus, setSessionStatus, setError, onAgentSwitchRef, lastMessageIdRef);
+      handleEvent(event, sessionId, setMessages, setStatus, setSessionStatus, setError, onAgentSwitchRef, lastMessageIdRef, setPendingQuestions);
     };
 
     es.onerror = () => {
@@ -428,6 +432,7 @@ export function useSessionEvents(
     cacheHit,
     initialScrollPosition,
     scrollPositionRef,
+    pendingQuestions,
   };
 }
 
@@ -437,6 +442,7 @@ type SetMessages = React.Dispatch<React.SetStateAction<AccumulatedMessage[]>>;
 type SetStatus = React.Dispatch<React.SetStateAction<SessionConnectionStatus>>;
 type SetSessionStatus = React.Dispatch<React.SetStateAction<"idle" | "busy">>;
 type SetError = React.Dispatch<React.SetStateAction<string | undefined>>;
+type SetPendingQuestions = React.Dispatch<React.SetStateAction<PendingQuestion[]>>;
 
 export function handleEvent(
   event: SSEEvent,
@@ -447,6 +453,7 @@ export function handleEvent(
   setError: SetError,
   onAgentSwitchRef: React.MutableRefObject<((agent: string) => void) | undefined>,
   lastMessageIdRef: React.MutableRefObject<string | null>,
+  setPendingQuestions: SetPendingQuestions,
 ): void {
   const { type, properties } = event;
 
@@ -519,6 +526,18 @@ export function handleEvent(
     setMessages((prev) =>
       applyTextDelta(prev, messageID, partID, sessionID, delta ?? "")
     );
+    return;
+  }
+
+  if (type === "question.asked") {
+    const question = properties as PendingQuestion;
+    setPendingQuestions((prev) => [...prev.filter((q) => q.id !== question.id), question]);
+    return;
+  }
+
+  if (type === "question.replied" || type === "question.rejected") {
+    const requestID = properties?.requestID;
+    setPendingQuestions((prev) => prev.filter((q) => q.id !== requestID));
     return;
   }
 }

@@ -161,3 +161,70 @@ export async function ensureInstanceById(
 
   return { instance: newInstance, client: newInstance.client };
 }
+
+/**
+ * Send answers to a question posed by the OpenCode server.
+ *
+ * Calls the native question reply endpoint directly via fetch because the
+ * installed SDK (v1.3.13) does not expose `client.question.*` methods.
+ *
+ * Throws if the instance is not found.
+ */
+/**
+ * Validate a question request ID to prevent path traversal.
+ * OpenCode server generates IDs matching [a-zA-Z0-9_-]+.
+ */
+function isValidQuestionId(id: string): boolean {
+  return /^[a-zA-Z0-9_-]+$/.test(id);
+}
+
+export async function respondToQuestion(
+  instanceId: string,
+  requestID: string,
+  answers: string[][]
+): Promise<boolean> {
+  if (!isValidQuestionId(requestID)) {
+    throw new Error(`Invalid question ID: ${requestID}`);
+  }
+
+  const instance = getInstance(instanceId);
+  if (!instance) {
+    throw new Error(`Instance not found: ${instanceId}`);
+  }
+
+  const url = `http://127.0.0.1:${instance.port}/question/${requestID}/reply`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ answers }),
+  });
+
+  return res.ok;
+}
+
+/**
+ * Reject a question posed by the OpenCode server.
+ *
+ * Calls the native question reject endpoint directly via fetch because the
+ * installed SDK (v1.3.13) does not expose `client.question.*` methods.
+ *
+ * Throws if the instance is not found.
+ */
+export async function rejectQuestion(
+  instanceId: string,
+  requestID: string
+): Promise<boolean> {
+  if (!isValidQuestionId(requestID)) {
+    throw new Error(`Invalid question ID: ${requestID}`);
+  }
+
+  const instance = getInstance(instanceId);
+  if (!instance) {
+    throw new Error(`Instance not found: ${instanceId}`);
+  }
+
+  const url = `http://127.0.0.1:${instance.port}/question/${requestID}/reject`;
+  const res = await fetch(url, { method: "POST" });
+
+  return res.ok;
+}

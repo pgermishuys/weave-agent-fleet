@@ -1,0 +1,308 @@
+"use client";
+
+import { useState, useCallback, useMemo } from "react";
+import { HelpCircle, Loader2, Check, X, Send, CornerDownRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { CollapsibleToolCall } from "../collapsible-tool-call";
+import { cn } from "@/lib/utils";
+import type {
+  AccumulatedPart,
+  PendingQuestion,
+  QuestionInfo,
+  QuestionOption,
+} from "@/lib/api-types";
+
+interface QuestionToolCardProps {
+  part: AccumulatedPart & { type: "tool" };
+  sessionId: string;
+  pendingQuestions: PendingQuestion[];
+}
+
+export function QuestionToolCard({
+  part,
+  sessionId,
+  pendingQuestions,
+}: QuestionToolCardProps) {
+  // Find the matching pending question using callID
+  const pending = useMemo(
+    () => pendingQuestions.find((q) => q.tool?.callID === part.callId),
+    [pendingQuestions, part.callId]
+  );
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const state = part.state as any;
+  const isCompleted = state?.status === "completed";
+  const isError = state?.status === "error";
+  const isRunning = state?.status === "running" || !state?.status;
+
+  // Determine questions to show — prefer pending question data, fall back to input
+  const questions: QuestionInfo[] = useMemo(() => {
+    if (pending?.questions?.length) return pending.questions;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const input = state?.input as any;
+    if (Array.isArray(input?.questions)) return input.questions;
+    return [];
+  }, [pending, state]);
+
+  const requestID = pending?.id;
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string[]>>({});
+  const [customTexts, setCustomTexts] = useState<Record<number, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [submittedAnswers, setSubmittedAnswers] = useState<string[][] | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // ── Option toggling ────────────────────────────────────────────────────────
+  const toggleOption = useCallback(
+    (qIndex: number, option: QuestionOption, multiple: boolean) => {
+      setSelectedAnswers((prev) => {
+        const current = prev[qIndex] ?? [];
+        if (multiple) {
+          // Multi-select: toggle independently
+          if (current.includes(option.label)) {
+            return { ...prev, [qIndex]: current.filter((l) => l !== option.label) };
+          }
+          return { ...prev, [qIndex]: [...current, option.label] };
+        }
+        // Single-select: if already selected, deselect; otherwise select only this one
+        if (current.includes(option.label)) {
+          return { ...prev, [qIndex]: [] };
+        }
+        return { ...prev, [qIndex]: [option.label] };
+      });
+    },
+    []
+  );
+
+  const setCustomText = useCallback((qIndex: number, text: string) => {
+    setCustomTexts((prev) => ({ ...prev, [qIndex]: text }));
+  }, []);
+
+  // ── Build answer payload ────────────────────────────────────────────────────
+  const buildAnswers = useCallback((): string[][] => {
+    return questions.map((q, i) => {
+      const selected = selectedAnswers[i] ?? [];
+      const custom = customTexts[i]?.trim();
+      const result: string[] = [...selected];
+      if (custom) result.push(custom);
+      // If nothing selected and question has no custom field (or custom===false), return empty
+      return result.length > 0 ? result : [];
+    });
+  }, [questions, selectedAnswers, customTexts]);
+
+  // ── Submit handler ──────────────────────────────────────────────────────────
+  const handleSubmit = useCallback(async () => {
+    if (!requestID || !sessionId) return;
+    const answers = buildAnswers();
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      const res = await fetch(
+        `/api/sessions/${sessionId}/questions/${requestID}/reply`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ answers }),
+        }
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(
+          (data as Record<string, unknown>)?.error as string ||
+            `Request failed (${res.status})`
+        );
+      }
+      setSubmittedAnswers(answers);
+      setIsSubmitted(true);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Submission failed");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [requestID, sessionId, buildAnswers]);
+
+  // ── Skip handler ────────────────────────────────────────────────────────────
+  const handleSkip = useCallback(async () => {
+    if (!requestID || !sessionId) return;
+    setIsSubmitting(true);
+    setSubmitError(null);
+    const skipAnswers = questions.map(() => ["user skipped"]);
+    try {
+      const res = await fetch(
+        `/api/sessions/${sessionId}/questions/${requestID}/reply`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ answers: skipAnswers }),
+        }
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(
+          (data as Record<string, unknown>)?.error as string ||
+            `Request failed (${res.status})`
+        );
+      }
+      setSubmittedAnswers(skipAnswers);
+      setIsSubmitted(true);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Skip failed");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [requestID, sessionId, questions]);
+
+  // ── Fallback: completed or no matching pending question ──────────────────
+  // Don't collapse if the user already submitted — keep showing the answer
+  if ((isCompleted || !requestID) && !isSubmitted) {
+    return <CollapsibleToolCall part={part} />;
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  return (
+    <div className="my-1 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs border-l-2 border-l-amber-500/60">
+      {/* Header bar */}
+      <div className="flex items-center gap-2 mb-2">
+        <HelpCircle className="h-3.5 w-3.5 shrink-0 text-amber-400" />
+        <span className="font-mono text-amber-500/90 text-xs">question</span>
+        {isRunning && !isSubmitted && (
+          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground shrink-0" />
+        )}
+        {isSubmitted && <Check className="h-3 w-3 text-green-500 shrink-0" />}
+        {isError && !isSubmitted && (
+          <X className="h-3 w-3 text-red-500 shrink-0" />
+        )}
+      </div>
+
+      {/* Questions */}
+      <div className="space-y-3">
+        {questions.map((q, qi) => {
+          const selected = selectedAnswers[qi] ?? [];
+          const showCustom = q.custom !== false;
+
+          return (
+            <div key={qi} className="space-y-2">
+              {/* Header */}
+              {q.header && (
+                <div className="font-semibold text-foreground/85">
+                  {q.header}
+                </div>
+              )}
+              {/* Question text */}
+              {q.question && (
+                <div className="text-muted-foreground leading-relaxed">
+                  {q.question}
+                </div>
+              )}
+
+              {/* Options */}
+              {q.options && q.options.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {q.options.map((opt) => {
+                    const isSelected = selected.includes(opt.label);
+                    return (
+                      <button
+                        key={opt.label}
+                        type="button"
+                        disabled={isSubmitted}
+                        onClick={() => toggleOption(qi, opt, !!q.multiple)}
+                        title={opt.description}
+                        className={cn(
+                          "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs border transition-colors",
+                          "disabled:cursor-not-allowed",
+                          isSelected
+                            ? "bg-amber-500/20 border-amber-500/40 text-amber-600 dark:text-amber-400"
+                            : "bg-muted/40 border-border hover:bg-muted/60 hover:border-amber-500/30"
+                        )}
+                      >
+                        {opt.description ? (
+                          <>
+                            <span>{opt.label}</span>
+                            <span className="text-[10px] text-muted-foreground/60 max-w-[140px] truncate hidden sm:inline">
+                              — {opt.description}
+                            </span>
+                          </>
+                        ) : (
+                          <span>{opt.label}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Custom / free-text input */}
+              {showCustom && (
+                <div className="flex items-center gap-1.5">
+                  <CornerDownRight className="h-3 w-3 shrink-0 text-muted-foreground/50" />
+                  <Input
+                    type="text"
+                    placeholder="Type a custom answer…"
+                    value={customTexts[qi] ?? ""}
+                    onChange={(e) => setCustomText(qi, e.target.value)}
+                    disabled={isSubmitted}
+                    className="h-7 text-xs"
+                  />
+                </div>
+              )}
+
+              {/* Submitted answer display */}
+              {isSubmitted && submittedAnswers && (
+                <div className="text-[11px] text-muted-foreground/70 mt-1">
+                  Answered:{" "}
+                  <span className="text-foreground/80">
+                    {submittedAnswers[qi]?.join(", ") || "(no answer)"}
+                  </span>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Action buttons */}
+      {!isSubmitted && questions.length > 0 && (
+        <div className="flex items-center gap-2 mt-3 pt-2 border-t border-border/40">
+          <Button
+            size="xs"
+            variant="default"
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="text-xs"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Sending…
+              </>
+            ) : (
+              <>
+                <Send className="h-3 w-3" />
+                Submit
+              </>
+            )}
+          </Button>
+          <Button
+            size="xs"
+            variant="ghost"
+            onClick={handleSkip}
+            disabled={isSubmitting}
+            className="text-xs text-muted-foreground"
+          >
+            Skip
+          </Button>
+        </div>
+      )}
+
+      {/* Submit error */}
+      {submitError && !isSubmitted && (
+        <div className="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-500/10 rounded px-2 py-1">
+          {submitError}
+        </div>
+      )}
+    </div>
+  );
+}

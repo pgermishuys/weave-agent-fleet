@@ -1,6 +1,6 @@
 "use client";
 
-import type { AccumulatedPart } from "@/lib/api-types";
+import type { AccumulatedPart, PendingQuestion } from "@/lib/api-types";
 import { CollapsibleToolCall } from "../collapsible-tool-call";
 import { ReadToolCard } from "./read-tool-card";
 import { WriteToolCard } from "./write-tool-card";
@@ -10,9 +10,14 @@ import { GrepToolCard } from "./grep-tool-card";
 import { GlobToolCard } from "./glob-tool-card";
 import { WebFetchToolCard } from "./webfetch-tool-card";
 import { SkillToolCard } from "./skill-tool-card";
+import { QuestionToolCard } from "./question-tool-card";
 
 interface ToolCardRouterProps {
   part: AccumulatedPart & { type: "tool" };
+  /** The OpenCode session ID — required by question tool card for API calls. */
+  sessionId?: string;
+  /** Pending questions from useSessionEvents — required by question tool card. */
+  pendingQuestions?: PendingQuestion[];
 }
 
 /**
@@ -23,7 +28,7 @@ interface ToolCardRouterProps {
  *
  * Unknown tools fall back to the generic `CollapsibleToolCall`.
  */
-export function ToolCardRouter({ part }: ToolCardRouterProps) {
+export function ToolCardRouter({ part, sessionId, pendingQuestions }: ToolCardRouterProps) {
   switch (part.tool) {
     case "read":
       return <ReadToolCard part={part} />;
@@ -41,6 +46,17 @@ export function ToolCardRouter({ part }: ToolCardRouterProps) {
       return <WebFetchToolCard part={part} />;
     case "skill":
       return <SkillToolCard part={part} />;
+    case "question":
+      if (sessionId) {
+        return (
+          <QuestionToolCard
+            part={part}
+            sessionId={sessionId}
+            pendingQuestions={pendingQuestions ?? []}
+          />
+        );
+      }
+      return <CollapsibleToolCall part={part} />;
     default:
       return <CollapsibleToolCall part={part} />;
   }

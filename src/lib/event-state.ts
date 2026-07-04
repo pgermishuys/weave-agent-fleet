@@ -295,6 +295,11 @@ export function isRelevantToSession(
     return properties?.sessionID === sessionId;
   }
 
+  // question events
+  if (type.startsWith("question.")) {
+    return properties?.sessionID === sessionId;
+  }
+
   // message.part.delta (undocumented event for streaming text)
   if (type === "message.part.delta") {
     return properties?.sessionID === sessionId;

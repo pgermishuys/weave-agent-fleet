@@ -11,7 +11,7 @@ import { useScrollAnchor } from "@/hooks/use-scroll-anchor";
 import { useActivityFilter } from "@/hooks/use-activity-filter";
 import { useKeyboardShortcut } from "@/hooks/use-keyboard-shortcut";
 import { useTextSelection } from "@/hooks/use-text-selection";
-import type { AccumulatedMessage, AccumulatedPart, AccumulatedToolPart, AccumulatedFilePart, AutocompleteAgent } from "@/lib/api-types";
+import type { AccumulatedMessage, AccumulatedPart, AccumulatedToolPart, AccumulatedFilePart, AutocompleteAgent, PendingQuestion } from "@/lib/api-types";
 import { isTaskToolCall, getTaskToolInput, getTaskToolSessionId } from "@/lib/api-types";
 import Link from "next/link";
 import type { SessionConnectionStatus } from "@/hooks/use-session-events";
@@ -77,6 +77,8 @@ interface ActivityStreamV1Props {
    * to open the SpawnSessionDialog.
    */
   onSpawnFromSelection?: (selectedText: string) => void;
+  /** Pending questions from question.asked events — threaded to QuestionToolCard. */
+  pendingQuestions?: PendingQuestion[];
 }
 
 function toTitleCase(s: string): string {
@@ -314,7 +316,7 @@ function TaskDelegationItem({ part, currentSessionId }: { part: AccumulatedToolP
 
 // ─── Tool Call Item ─────────────────────────────────────────────────────────
 
-function ToolCallItem({ part, currentSessionId }: { part: AccumulatedPart & { type: "tool" }; currentSessionId?: string }) {
+function ToolCallItem({ part, currentSessionId, pendingQuestions }: { part: AccumulatedPart & { type: "tool" }; currentSessionId?: string; pendingQuestions?: PendingQuestion[] }) {
   // Delegate task tool calls to the delegation block renderer
   if (isTaskToolCall(part) && getTaskToolInput(part)) {
     return <TaskDelegationItem part={part} currentSessionId={currentSessionId} />;
@@ -344,7 +346,7 @@ function ToolCallItem({ part, currentSessionId }: { part: AccumulatedPart & { ty
     }
   }
 
-  return <ToolCardRouter part={part} />;
+  return <ToolCardRouter part={part} sessionId={currentSessionId} pendingQuestions={pendingQuestions} />;
 }
 
 // ─── Message Item ───────────────────────────────────────────────────────────
@@ -356,6 +358,7 @@ interface MessageItemProps {
   highlightQuery?: string;
   isMatchingMessage?: boolean;
   currentSessionId?: string;
+  pendingQuestions?: PendingQuestion[];
 }
 
 const MessageItem = memo(function MessageItem({
@@ -364,6 +367,7 @@ const MessageItem = memo(function MessageItem({
   parentCreatedAt,
   isMatchingMessage,
   currentSessionId,
+  pendingQuestions,
 }: MessageItemProps) {
   const isUser = message.role === "user";
 
@@ -480,7 +484,7 @@ const MessageItem = memo(function MessageItem({
             return (
               <div key={`tools-${i}`} className="space-y-0.5">
                 {run.parts.map((part) => (
-                  <ToolCallItem key={part.partId} part={part} currentSessionId={currentSessionId} />
+                  <ToolCallItem key={part.partId} part={part} currentSessionId={currentSessionId} pendingQuestions={pendingQuestions} />
                 ))}
               </div>
             );
@@ -566,6 +570,7 @@ export function ActivityStreamV1({
   initialScrollPosition,
   suppressAutoScrollRef,
   onSpawnFromSelection,
+  pendingQuestions,
 }: ActivityStreamV1Props) {
   const { scrollRef, isAtBottom, isNearTop, newMessageCount, scrollToBottom, preserveScrollPosition, getScrollPosition, restoreScrollPosition, suppressAutoScroll: suppressAutoScrollLocalRef, viewportElement } =
     useScrollAnchor({ messageCount: messages.length, externalSuppressAutoScroll: suppressAutoScrollRef });
@@ -899,6 +904,7 @@ export function ActivityStreamV1({
                         highlightQuery={isFiltering ? searchQuery : undefined}
                         isMatchingMessage={isMatchingMessage}
                         currentSessionId={currentSessionId}
+                        pendingQuestions={pendingQuestions}
                       />
                     </div>
                   );

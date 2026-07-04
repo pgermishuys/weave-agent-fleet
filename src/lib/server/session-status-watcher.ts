@@ -205,6 +205,52 @@ function buildHandler(instanceId: string): InstanceEventListener {
           err,
         });
       }
+    } else if (type === "question.asked") {
+      // Question events indicate the session needs user input before continuing
+      const eventSessionId: string =
+        properties?.sessionID ?? properties?.info?.id ?? "";
+      if (!eventSessionId) return;
+
+      try {
+        const dbSession = getSessionByOpencodeId(eventSessionId);
+        if (dbSession && !TERMINAL_STATUSES.includes(dbSession.status) && dbSession.status !== "waiting_input") {
+          updateSessionStatus(dbSession.id, "waiting_input");
+          emitActivityStatus({
+            sessionId: eventSessionId,
+            instanceId,
+            activityStatus: "waiting_input",
+          });
+        }
+      } catch (err) {
+        log.warn("session-status-watcher", "Failed to persist waiting_input status for question.asked", {
+          sessionId: eventSessionId,
+          instanceId,
+          err,
+        });
+      }
+    } else if (type === "question.replied" || type === "question.rejected") {
+      // When the user answers or rejects a question, transition back to active
+      const eventSessionId: string =
+        properties?.sessionID ?? properties?.info?.id ?? "";
+      if (!eventSessionId) return;
+
+      try {
+        const dbSession = getSessionByOpencodeId(eventSessionId);
+        if (dbSession && dbSession.status === "waiting_input") {
+          updateSessionStatus(dbSession.id, "active");
+          emitActivityStatus({
+            sessionId: eventSessionId,
+            instanceId,
+            activityStatus: "busy",
+          });
+        }
+      } catch (err) {
+        log.warn("session-status-watcher", "Failed to persist active status for question.replied/rejected", {
+          sessionId: eventSessionId,
+          instanceId,
+          err,
+        });
+      }
     } else if (type === "message.part.updated") {
       // Delegate to the analytics collector — O(1) Map write, no DB, no EventEmitter.
       // The collector flushes accumulated data to DB on a timer (default: 2s).

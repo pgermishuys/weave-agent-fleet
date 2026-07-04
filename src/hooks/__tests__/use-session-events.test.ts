@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type React from "react";
-import type { AccumulatedMessage, SSEEvent } from "@/lib/api-types";
+import type { AccumulatedMessage, PendingQuestion, SSEEvent } from "@/lib/api-types";
 import { handleEvent } from "@/hooks/use-session-events";
 
 function createStateHarness(sessionId: string) {
@@ -8,6 +8,7 @@ function createStateHarness(sessionId: string) {
   let status: string | undefined;
   let sessionStatus: "idle" | "busy" = "idle";
   let error: string | undefined;
+  let pendingQuestions: PendingQuestion[] = [];
 
   const setMessages = (update: React.SetStateAction<AccumulatedMessage[]>) => {
     messages = typeof update === "function"
@@ -29,6 +30,11 @@ function createStateHarness(sessionId: string) {
       ? (update as (prev: string | undefined) => string | undefined)(error)
       : update;
   };
+  const setPendingQuestions = (update: React.SetStateAction<PendingQuestion[]>) => {
+    pendingQuestions = typeof update === "function"
+      ? (update as (prev: PendingQuestion[]) => PendingQuestion[])(pendingQuestions)
+      : update;
+  };
 
   const onAgentSwitchRef: React.MutableRefObject<((agent: string) => void) | undefined> = {
     current: vi.fn(),
@@ -45,12 +51,14 @@ function createStateHarness(sessionId: string) {
       setError,
       onAgentSwitchRef,
       lastMessageIdRef,
+      setPendingQuestions,
     );
   };
 
   return {
     dispatch,
     getMessages: () => messages,
+    getPendingQuestions: () => pendingQuestions,
   };
 }
 

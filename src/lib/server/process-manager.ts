@@ -633,7 +633,7 @@ export async function spawnInstance(directory: string): Promise<ManagedInstance>
           timeout: SPAWN_TIMEOUT_MS,
           config: {
             plugin: [],
-            permission: { edit: "allow", bash: "allow", external_directory: "allow" },
+            permission: { edit: "allow", bash: "allow", external_directory: "allow", question: "allow" },
             ...buildAgentModelConfig(directory),
           },
         });

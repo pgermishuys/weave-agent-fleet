@@ -1,13 +1,11 @@
 {
-  "active_plan": "/Users/maartenba/Desktop/weave2/.weave/plans/session-tree-features.md",
-  "started_at": "2026-04-03T11:05:40.308Z",
+  "active_plan": "/Users/sozmen/projects/weave-agent-fleet/.weave/plans/question-tool.md",
+  "started_at": "2026-07-04T21:27:07.219Z",
   "session_ids": [
-    "ses_2ad0c25c5ffeHggbgXCukPms2t"
+    "ses_0d15497aaffedc0JeXMzmjO5kf"
   ],
-  "plan_name": "session-tree-features",
+  "plan_name": "question-tool",
   "agent": "tapestry",
-  "start_sha": "44681961d5cfd25505baf7b3cc14c7fa8c3daac5",
-  "continuation_completed_snapshot": 21,
-  "stale_continuation_count": 0,
+  "start_sha": "2fa1e805698a93869b059638128b412387cce36f",
   "paused": true
 }

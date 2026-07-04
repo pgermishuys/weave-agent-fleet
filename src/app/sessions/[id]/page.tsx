@@ -102,7 +102,7 @@ export default function SessionDetailPage() {
   // suppress auto-scroll-to-bottom during cache hydration.
   const suppressAutoScrollRef = useRef(false);
 
-  const { messages, status, sessionStatus, error, forceIdle, reconnect, reconnectAttempt, hasMoreMessages, isLoadingOlder, loadOlderMessages, totalMessageCount, loadOlderError, cacheHit, initialScrollPosition, scrollPositionRef } = useSessionEvents(
+  const { messages, status, sessionStatus, error, forceIdle, reconnect, reconnectAttempt, hasMoreMessages, isLoadingOlder, loadOlderMessages, totalMessageCount, loadOlderError, cacheHit, initialScrollPosition, scrollPositionRef, pendingQuestions } = useSessionEvents(
     sessionId,
     instanceId,
     setSelectedAgent,
@@ -872,6 +872,7 @@ export default function SessionDetailPage() {
                     initialScrollPosition={initialScrollPosition}
                     suppressAutoScrollRef={suppressAutoScrollRef}
                     onSpawnFromSelection={setSpawnSelection}
+                    pendingQuestions={pendingQuestions}
                   />
                 </SlashCommandProvider>
               </div>
