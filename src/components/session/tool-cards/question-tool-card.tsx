@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { HelpCircle, Loader2, Check, X, Send, CornerDownRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +46,28 @@ export function QuestionToolCard({
   }, [pending, state]);
 
   const requestID = pending?.id;
+
+  // Track which callIDs we've ever seen a pending question for. The tool call
+  // part can render before the `question.asked` SSE event lands in
+  // pendingQuestions; during that window requestID is undefined. Without this
+  // ref we'd briefly render the "no longer accepting answers" stale state
+  // before flipping to the live form once the pending question arrives.
+  // Only treat as stale when we *had* a pending question and it's now gone.
+  const seenCallIds = useRef<Set<string>>(new Set());
+  if (pending) seenCallIds.current.add(part.callId);
+  const everSawPending = seenCallIds.current.has(part.callId);
+
+  // A question may have already been answered/rejected/expired server-side
+  // (e.g. race, instance restart, SSE list desync) while the tool call part
+  // is still rendered as "running". When that happens there is no pending
+  // entry — flag it so we render a disabled "no longer available" state
+  // instead of a live form that silently no-ops on Submit.
+  //
+  // `isCompleted` (SSE says the tool call finished cleanly) is NOT treated
+  // as stale — that path collapses to the regular CollapsibleToolCall below.
+  // `everSawPending` guards against a false stale flash on first render
+  // before the `question.asked` event has arrived.
+  const isStale = !requestID && !isCompleted && everSawPending;
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string[]>>({});
@@ -108,12 +130,30 @@ export function QuestionToolCard({
           body: JSON.stringify({ answers }),
         }
       );
+      const data = (await res.json().catch(() => null)) as
+        | Record<string, unknown>
+        | null;
+
+      // The API returns 200 with { alreadyAnswered: true } when the opencode
+      // server says the question is no longer awaiting an answer. Treat that
+      // as a benign race — flip to submitted so the UI stops being actionable.
+      if (res.ok && data?.alreadyAnswered === true) {
+        setSubmittedAnswers(answers);
+        setIsSubmitted(true);
+        setSubmitError(null);
+        return;
+      }
+
       if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(
-          (data as Record<string, unknown>)?.error as string ||
-            `Request failed (${res.status})`
-        );
+        // Non-2xx (and not alreadyAnswered) — surface the real message.
+        const upstreamInfo =
+          typeof data?.status === "number"
+            ? ` (upstream ${data.status})`
+            : "";
+        const message =
+          (typeof data?.error === "string" && data.error) ||
+          `Request failed (${res.status})${upstreamInfo}`;
+        throw new Error(message);
       }
       setSubmittedAnswers(answers);
       setIsSubmitted(true);
@@ -131,20 +171,51 @@ export function QuestionToolCard({
     setSubmitError(null);
     const skipAnswers = questions.map(() => ["user skipped"]);
     try {
+      // Skip prefers the dedicated /reject endpoint so the opencode server
+      // records it as a rejection rather than an empty answer.
       const res = await fetch(
-        `/api/sessions/${sessionId}/questions/${requestID}/reply`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ answers: skipAnswers }),
-        }
+        `/api/sessions/${sessionId}/questions/${requestID}/reject`,
+        { method: "POST" }
       );
+      const data = (await res.json().catch(() => null)) as
+        | Record<string, unknown>
+        | null;
+
+      if (res.ok && data?.alreadyAnswered === true) {
+        setSubmittedAnswers(skipAnswers);
+        setIsSubmitted(true);
+        setSubmitError(null);
+        return;
+      }
+
       if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(
-          (data as Record<string, unknown>)?.error as string ||
-            `Request failed (${res.status})`
+        // Fallback: send empty answers via /reply so a skip still works if
+        // the opencode server doesn't implement /reject for this ID.
+        const fallback = await fetch(
+          `/api/sessions/${sessionId}/questions/${requestID}/reply`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ answers: skipAnswers }),
+          }
         );
+        const fallbackData = (await fallback.json().catch(() => null)) as
+          | Record<string, unknown>
+          | null;
+        if (fallback.ok && fallbackData?.alreadyAnswered === true) {
+          setSubmittedAnswers(skipAnswers);
+          setIsSubmitted(true);
+          setSubmitError(null);
+          return;
+        }
+        if (!fallback.ok) {
+          const message =
+            (typeof fallbackData?.error === "string" && fallbackData.error) ||
+            (typeof fallbackData?.status === "number"
+              ? `Request failed (${fallbackData.status})`
+              : `Request failed (${fallback.status})`);
+          throw new Error(message);
+        }
       }
       setSubmittedAnswers(skipAnswers);
       setIsSubmitted(true);
@@ -156,8 +227,12 @@ export function QuestionToolCard({
   }, [requestID, sessionId, questions]);
 
   // ── Fallback: completed or no matching pending question ──────────────────
-  // Don't collapse if the user already submitted — keep showing the answer
-  if ((isCompleted || !requestID) && !isSubmitted) {
+  // Don't collapse if the user already submitted — keep showing the answer.
+  // Only collapse when the tool call is genuinely complete (SSE confirmed).
+  // A dropped-but-not-complete pending entry (race / restart / desync) is
+  // handled below as a disabled "stale" form so the user sees their input
+  // and a clear "no longer available" message rather than silent collapse.
+  if (isCompleted && !isSubmitted) {
     return <CollapsibleToolCall part={part} />;
   }
 
@@ -168,7 +243,7 @@ export function QuestionToolCard({
       <div className="flex items-center gap-2 mb-2">
         <HelpCircle className="h-3.5 w-3.5 shrink-0 text-amber-400" />
         <span className="font-mono text-amber-500/90 text-xs">question</span>
-        {isRunning && !isSubmitted && (
+        {isRunning && !isSubmitted && !isStale && (
           <Loader2 className="h-3 w-3 animate-spin text-muted-foreground shrink-0" />
         )}
         {isSubmitted && <Check className="h-3 w-3 text-green-500 shrink-0" />}
@@ -207,7 +282,7 @@ export function QuestionToolCard({
                       <button
                         key={opt.label}
                         type="button"
-                        disabled={isSubmitted}
+                        disabled={isSubmitted || isStale}
                         onClick={() => toggleOption(qi, opt, !!q.multiple)}
                         title={opt.description}
                         className={cn(
@@ -243,7 +318,7 @@ export function QuestionToolCard({
                     placeholder="Type a custom answer…"
                     value={customTexts[qi] ?? ""}
                     onChange={(e) => setCustomText(qi, e.target.value)}
-                    disabled={isSubmitted}
+                    disabled={isSubmitted || isStale}
                     className="h-7 text-xs"
                   />
                 </div>
@@ -264,37 +339,47 @@ export function QuestionToolCard({
       </div>
 
       {/* Action buttons */}
-      {!isSubmitted && questions.length > 0 && (
-        <div className="flex items-center gap-2 mt-3 pt-2 border-t border-border/40">
-          <Button
-            size="xs"
-            variant="default"
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="text-xs"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Sending…
-              </>
-            ) : (
-              <>
-                <Send className="h-3 w-3" />
-                Submit
-              </>
-            )}
-          </Button>
-          <Button
-            size="xs"
-            variant="ghost"
-            onClick={handleSkip}
-            disabled={isSubmitting}
-            className="text-xs text-muted-foreground"
-          >
-            Skip
-          </Button>
+      {isStale ? (
+        // Stale: the question is no longer accepting answers on the server.
+        // Don't render active Submit/Skip buttons — they would no-op. Show a
+        // clear notice so the user understands why nothing happens on click.
+        <div className="mt-3 pt-2 border-t border-border/40 text-xs text-amber-600 dark:text-amber-400">
+          This question is no longer accepting answers.
         </div>
+      ) : (
+        !isSubmitted &&
+        questions.length > 0 && (
+          <div className="flex items-center gap-2 mt-3 pt-2 border-t border-border/40">
+            <Button
+              size="xs"
+              variant="default"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="text-xs"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Sending…
+                </>
+              ) : (
+                <>
+                  <Send className="h-3 w-3" />
+                  Submit
+                </>
+              )}
+            </Button>
+            <Button
+              size="xs"
+              variant="ghost"
+              onClick={handleSkip}
+              disabled={isSubmitting}
+              className="text-xs text-muted-foreground"
+            >
+              Skip
+            </Button>
+          </div>
+        )
       )}
 
       {/* Submit error */}

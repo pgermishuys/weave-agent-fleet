@@ -163,6 +163,33 @@ export async function ensureInstanceById(
 }
 
 /**
+ * Result of a question reply/reject call to the OpenCode server.
+ *
+ * `ok` is true only when the server accepted the response (2xx).
+ * `status` is the upstream HTTP status (0 if the request never reached the
+ *   server, e.g. connection refused).
+ * `alreadyAnswered` is true when the upstream rejected the call because the
+ *   question was already replied/rejected/expired (404 or 409). Callers can
+ *   treat this as a benign race and mark the card as submitted rather than
+ *   surfacing an error.
+ * `body` is the raw upstream response body text (best-effort) for logging.
+ */
+export interface QuestionResponseResult {
+  ok: boolean;
+  status: number;
+  alreadyAnswered: boolean;
+  body: string | null;
+}
+
+async function readBodySafe(res: Response): Promise<string | null> {
+  try {
+    return await res.text();
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Send answers to a question posed by the OpenCode server.
  *
  * Calls the native question reply endpoint directly via fetch because the
@@ -182,7 +209,7 @@ export async function respondToQuestion(
   instanceId: string,
   requestID: string,
   answers: string[][]
-): Promise<boolean> {
+): Promise<QuestionResponseResult> {
   if (!isValidQuestionId(requestID)) {
     throw new Error(`Invalid question ID: ${requestID}`);
   }
@@ -193,13 +220,25 @@ export async function respondToQuestion(
   }
 
   const url = `http://127.0.0.1:${instance.port}/question/${requestID}/reply`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ answers }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ answers }),
+    });
+  } catch (err) {
+    log.error("opencode-client", "Question reply fetch failed", {
+      err,
+      instanceId,
+      requestID,
+    });
+    return { ok: false, status: 0, alreadyAnswered: false, body: null };
+  }
 
-  return res.ok;
+  const body = await readBodySafe(res);
+  const alreadyAnswered = res.status === 404 || res.status === 409;
+  return { ok: res.ok, status: res.status, alreadyAnswered, body };
 }
 
 /**
@@ -213,7 +252,7 @@ export async function respondToQuestion(
 export async function rejectQuestion(
   instanceId: string,
   requestID: string
-): Promise<boolean> {
+): Promise<QuestionResponseResult> {
   if (!isValidQuestionId(requestID)) {
     throw new Error(`Invalid question ID: ${requestID}`);
   }
@@ -224,7 +263,19 @@ export async function rejectQuestion(
   }
 
   const url = `http://127.0.0.1:${instance.port}/question/${requestID}/reject`;
-  const res = await fetch(url, { method: "POST" });
+  let res: Response;
+  try {
+    res = await fetch(url, { method: "POST" });
+  } catch (err) {
+    log.error("opencode-client", "Question reject fetch failed", {
+      err,
+      instanceId,
+      requestID,
+    });
+    return { ok: false, status: 0, alreadyAnswered: false, body: null };
+  }
 
-  return res.ok;
+  const body = await readBodySafe(res);
+  const alreadyAnswered = res.status === 404 || res.status === 409;
+  return { ok: res.ok, status: res.status, alreadyAnswered, body };
 }

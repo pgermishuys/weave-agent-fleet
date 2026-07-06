@@ -52,19 +52,36 @@ export async function POST(
   }
 
   try {
-    const ok = await respondToQuestion(
+    const result = await respondToQuestion(
       dbSession.instance_id,
       questionId,
       answers as string[][]
     );
-    if (!ok) {
-      log.error("reply", "respondToQuestion returned false", {
+    if (!result.ok) {
+      log.error("reply", "respondToQuestion returned non-2xx", {
         instanceId: dbSession.instance_id,
         questionId,
+        status: result.status,
+        alreadyAnswered: result.alreadyAnswered,
+        body: result.body,
       });
+      // 404/409 from the opencode server means the question is no longer
+      // awaiting an answer (already replied/rejected/expired). Surface this
+      // to the client so the UI can treat it as a benign race instead of an
+      // error.
+      if (result.alreadyAnswered) {
+        return NextResponse.json(
+          { ok: false, alreadyAnswered: true, status: result.status },
+          { status: 200 }
+        );
+      }
+      // status === 0 → upstream unreachable; map to 502. Otherwise proxy the
+      // upstream status so the client shows something actionable.
+      const proxyStatus =
+        result.status === 0 ? 502 : Math.max(400, Math.min(599, result.status));
       return NextResponse.json(
-        { error: "Question reply failed" },
-        { status: 502 }
+        { error: "Question reply failed", status: result.status },
+        { status: proxyStatus }
       );
     }
     return NextResponse.json({ ok: true });

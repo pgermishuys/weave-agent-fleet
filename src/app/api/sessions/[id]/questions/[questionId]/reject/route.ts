@@ -32,15 +32,26 @@ export async function POST(
   }
 
   try {
-    const ok = await rejectQuestion(dbSession.instance_id, questionId);
-    if (!ok) {
-      log.error("reject", "rejectQuestion returned false", {
+    const result = await rejectQuestion(dbSession.instance_id, questionId);
+    if (!result.ok) {
+      log.error("reject", "rejectQuestion returned non-2xx", {
         instanceId: dbSession.instance_id,
         questionId,
+        status: result.status,
+        alreadyAnswered: result.alreadyAnswered,
+        body: result.body,
       });
+      if (result.alreadyAnswered) {
+        return NextResponse.json(
+          { ok: false, alreadyAnswered: true, status: result.status },
+          { status: 200 }
+        );
+      }
+      const proxyStatus =
+        result.status === 0 ? 502 : Math.max(400, Math.min(599, result.status));
       return NextResponse.json(
-        { error: "Question rejection failed" },
-        { status: 502 }
+        { error: "Question rejection failed", status: result.status },
+        { status: proxyStatus }
       );
     }
     return NextResponse.json({ ok: true });

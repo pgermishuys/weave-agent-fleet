@@ -19,6 +19,7 @@ const {
   mockGetDbInstance,
   mockUpdateSessionInstanceId,
   mockUpdateSessionStatus,
+  mockFetch,
 } = vi.hoisted(() => ({
   mockGetInstanceFromPM: vi.fn(),
   mockSpawnInstance: vi.fn(),
@@ -27,6 +28,7 @@ const {
   mockGetDbInstance: vi.fn(),
   mockUpdateSessionInstanceId: vi.fn(),
   mockUpdateSessionStatus: vi.fn(),
+  mockFetch: vi.fn(),
 }));
 
 vi.mock("@/lib/server/process-manager", () => ({
@@ -56,6 +58,8 @@ vi.mock("@/lib/server/logger", () => ({
 import {
   ensureInstanceForSession,
   ensureInstanceById,
+  respondToQuestion,
+  rejectQuestion,
 } from "@/lib/server/opencode-client";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -361,5 +365,253 @@ describe("ensureInstanceById", () => {
 
     expect(mockSpawnInstance).toHaveBeenCalledWith("/tmp/proj");
     expect(result.instance).toBe(newInst);
+  });
+});
+
+// ─── respondToQuestion tests ──────────────────────────────────────────────────
+
+describe("respondToQuestion", () => {
+  const VALID_ID = "q_abc123";
+  const VALID_ANSWERS = [["yes"], ["no", "maybe"]];
+
+  function mockResponse(
+    status: number,
+    body: string = ""
+  ): Response {
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      text: vi.fn().mockResolvedValue(body),
+    } as unknown as Response;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetInstanceFromPM.mockReturnValue(makeManagedInstance("inst-live"));
+    vi.stubGlobal("fetch", mockFetch);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("ThrowsOnInvalidQuestionId", async () => {
+    await expect(
+      respondToQuestion("inst-live", "../traversal", VALID_ANSWERS)
+    ).rejects.toThrow("Invalid question ID");
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("ThrowsWhenInstanceNotFound", async () => {
+    mockGetInstanceFromPM.mockReturnValue(undefined);
+    await expect(
+      respondToQuestion("missing-inst", VALID_ID, VALID_ANSWERS)
+    ).rejects.toThrow("Instance not found: missing-inst");
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("ReturnsOkTrueOn2xx", async () => {
+    mockFetch.mockResolvedValue(mockResponse(200, '{"ok":true}'));
+    const result = await respondToQuestion(
+      "inst-live",
+      VALID_ID,
+      VALID_ANSWERS
+    );
+    expect(result).toEqual({
+      ok: true,
+      status: 200,
+      alreadyAnswered: false,
+      body: '{"ok":true}',
+    });
+    expect(mockFetch).toHaveBeenCalledWith(
+      "http://127.0.0.1:4100/question/q_abc123/reply",
+      expect.objectContaining({ method: "POST" })
+    );
+  });
+
+  it("ReturnsAlreadyAnsweredTrueOn404", async () => {
+    mockFetch.mockResolvedValue(mockResponse(404, "not found"));
+    const result = await respondToQuestion(
+      "inst-live",
+      VALID_ID,
+      VALID_ANSWERS
+    );
+    expect(result).toEqual({
+      ok: false,
+      status: 404,
+      alreadyAnswered: true,
+      body: "not found",
+    });
+  });
+
+  it("ReturnsAlreadyAnsweredTrueOn409", async () => {
+    mockFetch.mockResolvedValue(mockResponse(409, "conflict"));
+    const result = await respondToQuestion(
+      "inst-live",
+      VALID_ID,
+      VALID_ANSWERS
+    );
+    expect(result.alreadyAnswered).toBe(true);
+    expect(result.ok).toBe(false);
+    expect(result.status).toBe(409);
+  });
+
+  it("ReturnsAlreadyAnsweredFalseOn500", async () => {
+    mockFetch.mockResolvedValue(mockResponse(500, "server error"));
+    const result = await respondToQuestion(
+      "inst-live",
+      VALID_ID,
+      VALID_ANSWERS
+    );
+    expect(result).toEqual({
+      ok: false,
+      status: 500,
+      alreadyAnswered: false,
+      body: "server error",
+    });
+  });
+
+  it("ReturnsStatus0WhenFetchThrows", async () => {
+    mockFetch.mockRejectedValue(new Error("ECONNREFUSED"));
+    const result = await respondToQuestion(
+      "inst-live",
+      VALID_ID,
+      VALID_ANSWERS
+    );
+    expect(result).toEqual({
+      ok: false,
+      status: 0,
+      alreadyAnswered: false,
+      body: null,
+    });
+  });
+
+  it("ReturnsBodyNullWhenTextThrows", async () => {
+    const res = mockResponse(200, "");
+    (res.text as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error("stream error")
+    );
+    mockFetch.mockResolvedValue(res);
+    const result = await respondToQuestion(
+      "inst-live",
+      VALID_ID,
+      VALID_ANSWERS
+    );
+    expect(result.body).toBeNull();
+    expect(result.ok).toBe(true);
+  });
+
+  it("SendsAnswersInRequestBody", async () => {
+    mockFetch.mockResolvedValue(mockResponse(200));
+    await respondToQuestion("inst-live", VALID_ID, VALID_ANSWERS);
+    const callArgs = mockFetch.mock.calls[0][1] as RequestInit;
+    expect(JSON.parse(callArgs.body as string)).toEqual({
+      answers: VALID_ANSWERS,
+    });
+    expect(callArgs.headers).toEqual({
+      "Content-Type": "application/json",
+    });
+  });
+});
+
+// ─── rejectQuestion tests ─────────────────────────────────────────────────────
+
+describe("rejectQuestion", () => {
+  const VALID_ID = "q_abc123";
+
+  function mockResponse(
+    status: number,
+    body: string = ""
+  ): Response {
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      text: vi.fn().mockResolvedValue(body),
+    } as unknown as Response;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetInstanceFromPM.mockReturnValue(makeManagedInstance("inst-live"));
+    vi.stubGlobal("fetch", mockFetch);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("ThrowsOnInvalidQuestionId", async () => {
+    await expect(
+      rejectQuestion("inst-live", "bad/id")
+    ).rejects.toThrow("Invalid question ID");
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("ThrowsWhenInstanceNotFound", async () => {
+    mockGetInstanceFromPM.mockReturnValue(undefined);
+    await expect(rejectQuestion("missing-inst", VALID_ID)).rejects.toThrow(
+      "Instance not found: missing-inst"
+    );
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("ReturnsOkTrueOn2xx", async () => {
+    mockFetch.mockResolvedValue(mockResponse(200, ""));
+    const result = await rejectQuestion("inst-live", VALID_ID);
+    expect(result).toEqual({
+      ok: true,
+      status: 200,
+      alreadyAnswered: false,
+      body: "",
+    });
+    expect(mockFetch).toHaveBeenCalledWith(
+      "http://127.0.0.1:4100/question/q_abc123/reject",
+      { method: "POST" }
+    );
+  });
+
+  it("ReturnsAlreadyAnsweredTrueOn404", async () => {
+    mockFetch.mockResolvedValue(mockResponse(404, "gone"));
+    const result = await rejectQuestion("inst-live", VALID_ID);
+    expect(result).toEqual({
+      ok: false,
+      status: 404,
+      alreadyAnswered: true,
+      body: "gone",
+    });
+  });
+
+  it("ReturnsAlreadyAnsweredTrueOn409", async () => {
+    mockFetch.mockResolvedValue(mockResponse(409, "conflict"));
+    const result = await rejectQuestion("inst-live", VALID_ID);
+    expect(result.alreadyAnswered).toBe(true);
+    expect(result.ok).toBe(false);
+  });
+
+  it("ReturnsAlreadyAnsweredFalseOn500", async () => {
+    mockFetch.mockResolvedValue(mockResponse(500, "err"));
+    const result = await rejectQuestion("inst-live", VALID_ID);
+    expect(result.alreadyAnswered).toBe(false);
+    expect(result.ok).toBe(false);
+    expect(result.status).toBe(500);
+  });
+
+  it("ReturnsStatus0WhenFetchThrows", async () => {
+    mockFetch.mockRejectedValue(new Error("ECONNREFUSED"));
+    const result = await rejectQuestion("inst-live", VALID_ID);
+    expect(result).toEqual({
+      ok: false,
+      status: 0,
+      alreadyAnswered: false,
+      body: null,
+    });
+  });
+
+  it("UsesPostMethodWithoutBody", async () => {
+    mockFetch.mockResolvedValue(mockResponse(200));
+    await rejectQuestion("inst-live", VALID_ID);
+    const callArgs = mockFetch.mock.calls[0][1] as RequestInit;
+    expect(callArgs.method).toBe("POST");
+    expect(callArgs.body).toBeUndefined();
   });
 });
