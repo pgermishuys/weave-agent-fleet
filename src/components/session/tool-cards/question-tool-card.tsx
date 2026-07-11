@@ -103,6 +103,21 @@ export function QuestionToolCard({
     setCustomTexts((prev) => ({ ...prev, [qIndex]: text }));
   }, []);
 
+  // ── Selection guard ─────────────────────────────────────────────────────────
+  // True only when EVERY question has a selected option or non-empty custom text.
+  // Used to gate both the keyboard shortcut and the Submit button so the user
+  // can't fire off a partial answer set.
+  const hasSelection = useMemo(() => {
+    if (questions.length === 0) return false;
+    return questions.every((q, i) => {
+      const selected = selectedAnswers[i] ?? [];
+      if (selected.length > 0) return true;
+      const custom = customTexts[i]?.trim();
+      if (custom) return true;
+      return false;
+    });
+  }, [questions, selectedAnswers, customTexts]);
+
   // ── Build answer payload ────────────────────────────────────────────────────
   const buildAnswers = useCallback((): string[][] => {
     return questions.map((q, i) => {
@@ -117,7 +132,7 @@ export function QuestionToolCard({
 
   // ── Submit handler ──────────────────────────────────────────────────────────
   const handleSubmit = useCallback(async () => {
-    if (!requestID || !sessionId) return;
+    if (!requestID || !sessionId || !hasSelection) return;
     const answers = buildAnswers();
     setIsSubmitting(true);
     setSubmitError(null);
@@ -162,7 +177,7 @@ export function QuestionToolCard({
     } finally {
       setIsSubmitting(false);
     }
-  }, [requestID, sessionId, buildAnswers]);
+  }, [requestID, sessionId, buildAnswers, hasSelection]);
 
   // ── Skip handler ────────────────────────────────────────────────────────────
   const handleSkip = useCallback(async () => {
@@ -226,6 +241,41 @@ export function QuestionToolCard({
     }
   }, [requestID, sessionId, questions]);
 
+  // ── Keyboard submit ─────────────────────────────────────────────────────────
+  // Pressing Enter (without Shift) on any custom text input triggers submit.
+  // This mirrors the Submit button behaviour so users can answer without
+  // reaching for the mouse. Shift+Enter is ignored (reserved for newlines
+  // in potential future multi-line inputs).
+  const handleInputKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter" && !e.shiftKey && !isSubmitting && !isSubmitted && !isStale) {
+        e.preventDefault();
+        handleSubmit();
+      }
+    },
+    [handleSubmit, isSubmitting, isSubmitted, isStale]
+  );
+
+  // Pressing Enter anywhere on the card submits — as long as every question
+  // has been answered. Option buttons suppress Enter themselves (no toggle),
+  // and the custom text input handles Enter separately above, so this
+  // container handler catches Enter from any remaining target (including the
+  // card background) and triggers submit when all questions are answered.
+  const handleCardKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (e.key !== "Enter" || e.shiftKey) return;
+      const target = e.target as HTMLElement;
+      // Let the custom text input handle Enter itself (triggers submit
+      // directly); don't double-fire from the container.
+      if (target.tagName === "INPUT") return;
+      if (!isSubmitting && !isSubmitted && !isStale && hasSelection) {
+        e.preventDefault();
+        handleSubmit();
+      }
+    },
+    [handleSubmit, isSubmitting, isSubmitted, isStale, hasSelection]
+  );
+
   // ── Fallback: completed or no matching pending question ──────────────────
   // Don't collapse if the user already submitted — keep showing the answer.
   // Only collapse when the tool call is genuinely complete (SSE confirmed).
@@ -238,7 +288,10 @@ export function QuestionToolCard({
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="my-1 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs border-l-2 border-l-amber-500/60">
+    <div
+      className="my-1 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs border-l-2 border-l-amber-500/60"
+      onKeyDown={handleCardKeyDown}
+    >
       {/* Header bar */}
       <div className="flex items-center gap-2 mb-2">
         <HelpCircle className="h-3.5 w-3.5 shrink-0 text-amber-400" />
@@ -284,6 +337,11 @@ export function QuestionToolCard({
                         type="button"
                         disabled={isSubmitted || isStale}
                         onClick={() => toggleOption(qi, opt, !!q.multiple)}
+                        onKeyDown={(e) => {
+                          // Enter is reserved for submit — suppress native
+                          // button click-on-Enter so it doesn't also toggle
+                          if (e.key === "Enter") e.preventDefault();
+                        }}
                         title={opt.description}
                         className={cn(
                           "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs border transition-colors",
@@ -318,6 +376,7 @@ export function QuestionToolCard({
                     placeholder="Type a custom answer…"
                     value={customTexts[qi] ?? ""}
                     onChange={(e) => setCustomText(qi, e.target.value)}
+                    onKeyDown={handleInputKeyDown}
                     disabled={isSubmitted || isStale}
                     className="h-7 text-xs"
                   />
@@ -354,7 +413,8 @@ export function QuestionToolCard({
               size="xs"
               variant="default"
               onClick={handleSubmit}
-              disabled={isSubmitting}
+              disabled={isSubmitting || !hasSelection}
+              title={!hasSelection ? "Select an option or type an answer first" : undefined}
               className="text-xs"
             >
               {isSubmitting ? (
