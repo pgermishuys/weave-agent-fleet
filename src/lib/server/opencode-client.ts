@@ -219,7 +219,8 @@ export async function respondToQuestion(
     throw new Error(`Instance not found: ${instanceId}`);
   }
 
-  const url = `http://127.0.0.1:${instance.port}/question/${requestID}/reply`;
+  const params = new URLSearchParams({ directory: instance.directory });
+  const url = `http://127.0.0.1:${instance.port}/question/${requestID}/reply?${params}`;
   let res: Response;
   try {
     res = await fetch(url, {
@@ -262,7 +263,8 @@ export async function rejectQuestion(
     throw new Error(`Instance not found: ${instanceId}`);
   }
 
-  const url = `http://127.0.0.1:${instance.port}/question/${requestID}/reject`;
+  const params = new URLSearchParams({ directory: instance.directory });
+  const url = `http://127.0.0.1:${instance.port}/question/${requestID}/reject?${params}`;
   let res: Response;
   try {
     res = await fetch(url, { method: "POST" });

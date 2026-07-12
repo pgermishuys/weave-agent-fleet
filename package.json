@@ -29,6 +29,8 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "highlight.js": "^11.11.1",
+    "lightningcss": "^1.32.0",
+    "lightningcss-darwin-arm64": "^1.32.0",
     "lucide-react": "^1.7.0",
     "monaco-editor": "^0.55.1",
     "next": "16.2.1",
@@ -44,6 +46,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@tauri-apps/cli": "^2",
+    "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "@types/better-sqlite3": "^7.6.13",

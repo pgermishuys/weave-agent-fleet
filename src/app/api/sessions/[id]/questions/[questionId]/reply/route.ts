@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { respondToQuestion } from "@/lib/server/opencode-client";
+import { respondToQuestion, rejectQuestion } from "@/lib/server/opencode-client";
 import { getSessionByOpencodeId } from "@/lib/server/db-repository";
 import { log } from "@/lib/server/logger";
 
@@ -51,12 +51,61 @@ export async function POST(
     );
   }
 
+  // Check if all answers are ["skipped"] (user skipped all questions)
+  const allSkipped = answers.every((a) => a.length === 1 && a[0] === "skipped");
+
+  // If all questions are skipped, use the /reject endpoint instead
+  if (allSkipped) {
+    try {
+      const result = await rejectQuestion(dbSession.instance_id, questionId);
+      if (!result.ok) {
+        log.error("reply", "rejectQuestion returned non-2xx", {
+          instanceId: dbSession.instance_id,
+          questionId,
+          status: result.status,
+          alreadyAnswered: result.alreadyAnswered,
+          body: result.body,
+        });
+        if (result.alreadyAnswered) {
+          return NextResponse.json(
+            { ok: false, alreadyAnswered: true, status: result.status },
+            { status: 200 }
+          );
+        }
+        const proxyStatus =
+          result.status === 0 ? 502 : Math.max(400, Math.min(599, result.status));
+        return NextResponse.json(
+          { error: "Question rejection failed", status: result.status },
+          { status: proxyStatus }
+        );
+      }
+      return NextResponse.json({ ok: true });
+    } catch (err) {
+      log.error("reply", "Failed to reject question (all skipped)", {
+        err,
+        instanceId: dbSession.instance_id,
+        questionId,
+      });
+      return NextResponse.json(
+        { error: "Failed to reject question" },
+        { status: 500 }
+      );
+    }
+  }
+
+  // Filter out ["skipped"] answers before sending to respondToQuestion
+  // (in case some questions are answered and others are skipped)
+  const filteredAnswers = answers.filter(
+    (a) => !(a.length === 1 && a[0] === "skipped")
+  );
+
   try {
     const result = await respondToQuestion(
       dbSession.instance_id,
       questionId,
-      answers as string[][]
+      filteredAnswers as string[][]
     );
+
     if (!result.ok) {
       log.error("reply", "respondToQuestion returned non-2xx", {
         instanceId: dbSession.instance_id,

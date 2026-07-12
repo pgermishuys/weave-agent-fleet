@@ -424,9 +424,19 @@ describe("respondToQuestion", () => {
       body: '{"ok":true}',
     });
     expect(mockFetch).toHaveBeenCalledWith(
-      "http://127.0.0.1:4100/question/q_abc123/reply",
+      "http://127.0.0.1:4100/question/q_abc123/reply?directory=%2Ftmp%2Fproj",
       expect.objectContaining({ method: "POST" })
     );
+  });
+
+  it("IncludesDirectoryQueryParamForWorkspaceRouting", async () => {
+    // Regression test: without ?directory=, OpenCode routes to process.cwd()
+    // instead of the workspace directory, causing QuestionNotFoundError.
+    mockFetch.mockResolvedValue(mockResponse(200, '{"ok":true}'));
+    await respondToQuestion("inst-live", VALID_ID, VALID_ANSWERS);
+    const calledUrl: string = mockFetch.mock.calls[0][0];
+    expect(calledUrl).toContain("?directory=");
+    expect(calledUrl).toContain(encodeURIComponent("/tmp/proj"));
   });
 
   it("ReturnsAlreadyAnsweredTrueOn404", async () => {
@@ -565,9 +575,19 @@ describe("rejectQuestion", () => {
       body: "",
     });
     expect(mockFetch).toHaveBeenCalledWith(
-      "http://127.0.0.1:4100/question/q_abc123/reject",
+      "http://127.0.0.1:4100/question/q_abc123/reject?directory=%2Ftmp%2Fproj",
       { method: "POST" }
     );
+  });
+
+  it("IncludesDirectoryQueryParamForWorkspaceRouting", async () => {
+    // Regression test: without ?directory=, OpenCode routes to process.cwd()
+    // instead of the workspace directory, causing QuestionNotFoundError.
+    mockFetch.mockResolvedValue(mockResponse(200, ""));
+    await rejectQuestion("inst-live", VALID_ID);
+    const calledUrl: string = mockFetch.mock.calls[0][0];
+    expect(calledUrl).toContain("?directory=");
+    expect(calledUrl).toContain(encodeURIComponent("/tmp/proj"));
   });
 
   it("ReturnsAlreadyAnsweredTrueOn404", async () => {
